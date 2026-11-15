@@ -1,0 +1,19 @@
+const vec = @import("vec3.zig");
+const Ray = @import("Ray.zig");
+
+const Self = @This();
+
+p: vec.Point3,
+normal: vec.Vec3,
+t: f32,
+front_face: bool,
+
+pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f32, ray: Ray) Self {
+    const front_face = vec.dot(ray.direction, outward_normal) < 0;
+    return .{
+        .p = p,
+        .t = t,
+        .front_face = front_face,
+        .normal = if (front_face) outward_normal else -outward_normal,
+    };
+}

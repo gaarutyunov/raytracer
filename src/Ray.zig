@@ -1,0 +1,19 @@
+const vec = @import("vec3.zig");
+const Vec3 = vec.Vec3;
+const Point3 = vec.Point3;
+
+const Ray = @This();
+
+origin: Point3,
+direction: Vec3,
+
+pub fn init(origin: Point3, direction: Vec3) Ray {
+    return .{
+        .origin = origin,
+        .direction = direction,
+    };
+}
+
+pub fn at(self: Ray, t: f32) Point3 {
+    return self.origin + @as(Vec3, @splat(t)) * self.direction;
+}
