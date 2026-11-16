@@ -3,6 +3,8 @@ const Hittable = @import("Hittable.zig");
 const HittableList = @import("HittableList.zig").HittableList;
 const Sphere = @import("Sphere.zig");
 const Camera = @import("Camera.zig");
+const Lambertian = @import("Lambertian.zig");
+const Metal = @import("Metal.zig");
 
 pub fn main(init: std.process.Init) !void {
     const rng: std.Random.IoSource = .{ .io = init.io };
@@ -25,9 +27,42 @@ pub fn main(init: std.process.Init) !void {
     var world: HittableList(Hittable) = try .init(init.gpa, 2);
     const hittable = &world.interface;
     defer world.deinit(init.gpa);
-
-    try world.add(init.gpa, &Sphere.init(.{ 0, 0, -1 }, 0.5).interface);
-    try world.add(init.gpa, &Sphere.init(.{ 0, -100.5, -1 }, 100).interface);
+    // left
+    try world.add(
+        init.gpa,
+        &Sphere.init(
+            .{ -1.0, 0, -1.0 },
+            0.5,
+            &Metal.init(.{ 0.8, 0.8, 0.8 }, rand, 0.3).interface,
+        ).interface,
+    );
+    // center
+    try world.add(
+        init.gpa,
+        &Sphere.init(
+            .{ 0, 0, -1.2 },
+            0.5,
+            &Lambertian.init(.{ 0.1, 0.2, 0.5 }, rand).interface,
+        ).interface,
+    );
+    // right
+    try world.add(
+        init.gpa,
+        &Sphere.init(
+            .{ 1.0, 0, -1.0 },
+            0.5,
+            &Metal.init(.{ 0.2, 0.6, 0.2 }, rand, 1.0).interface,
+        ).interface,
+    );
+    // ground
+    try world.add(
+        init.gpa,
+        &Sphere.init(
+            .{ 0, -100.5, -1 },
+            100,
+            &Lambertian.init(.{ 0.8, 0.8, 0 }, rand).interface,
+        ).interface,
+    );
 
     const io = init.io;
     var buffer: [4096]u8 = undefined;

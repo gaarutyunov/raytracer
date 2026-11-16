@@ -57,12 +57,15 @@ pub fn init(
     };
 }
 
-fn ray_color(self: Self, r: Ray, world: *const Hittable, depth: u32) Color {
+fn rayColor(self: Self, r: Ray, world: *const Hittable, depth: u32) Color {
     if (depth <= 0) return .{ 0, 0, 0 };
 
     if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
-        const direction = rec.normal + vec.random_unit(self.rand);
-        return @as(Vec3, @splat(0.5)) * self.ray_color(.init(rec.p, direction), world, depth - 1);
+        if (rec.mat.scatter(r, rec.p, rec.normal)) |srec| {
+            const scattered, const attenuation = srec;
+            return attenuation * self.rayColor(scattered, world, depth - 1);
+        }
+        return .{ 0, 0, 0 };
     }
     const unit_dir = vec.unit(r.direction);
     const a: Vec3 = @splat(0.5 * unit_dir[1] + 1.0);
@@ -80,7 +83,7 @@ pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger
             var pixel_color: color.Color = .{ 0, 0, 0 };
 
             for (0..self.samples_per_pixel) |_| {
-                pixel_color += self.ray_color(self.get_ray(i, j), world, self.max_depth);
+                pixel_color += self.rayColor(self.getRay(i, j), world, self.max_depth);
             }
 
             try color.write(pixel_color * @as(Vec3, @splat(self.pixel_samples_scale)), writer);
@@ -88,12 +91,12 @@ pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger
     }
 }
 
-fn sample_square(self: Self) Vec3 {
+fn sampleSquare(self: Self) Vec3 {
     return .{ self.rand.float(f64) - 0.5, self.rand.float(f64) - 0.5, 0 };
 }
 
-fn get_ray(self: Self, i: usize, j: usize) Ray {
-    const offset = self.sample_square();
+fn getRay(self: Self, i: usize, j: usize) Ray {
+    const offset = self.sampleSquare();
     const pixel_sample = self.pixel00_loc +
         @as(Vec3, @splat(@as(f64, @floatFromInt(i)) + offset[0])) * self.pixel_delta_u +
         @as(Vec3, @splat(@as(f64, @floatFromInt(j)) + offset[1])) * self.pixel_delta_v;

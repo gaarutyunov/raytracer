@@ -21,16 +21,26 @@ pub fn unit(u: Vec3) Vec3 {
     return u / @as(Vec3, @splat(length(u)));
 }
 
-pub fn random_unit(rand: std.Random) Vec3 {
+pub fn reflect(u: Vec3, normal: Vec3) Vec3 {
+    return u - @as(Vec3, @splat(2 * dot(u, normal))) * normal;
+}
+
+pub fn isNearZero(u: Vec3) bool {
+    const s: Vec3 = @splat(1e-8);
+
+    return @reduce(.And, @abs(u) < s);
+}
+
+pub fn randomUnit(rand: std.Random) Vec3 {
     while (true) {
-        const p = random_range(rand, -1, 1);
+        const p = randomRange(rand, -1, 1);
         const lensq = dot(p, p);
         if (1e-160 < lensq and lensq <= 1) return p / @as(Vec3, @splat(@sqrt(lensq)));
     }
 }
 
-pub fn random_on_hemisphere(rand: std.Random, normal: Vec3) Vec3 {
-    const on_unit_sphere = random_unit(rand);
+pub fn randomOnHemisphere(rand: std.Random, normal: Vec3) Vec3 {
+    const on_unit_sphere = randomUnit(rand);
     if (dot(on_unit_sphere, normal) > 0.0) {
         return on_unit_sphere;
     }
@@ -42,7 +52,7 @@ pub fn random(rand: std.Random) Vec3 {
     return .{ rand.float(f64), rand.float(f64), rand.float(f64) };
 }
 
-pub fn random_range(rand: std.Random, min: f64, max: f64) Vec3 {
+pub fn randomRange(rand: std.Random, min: f64, max: f64) Vec3 {
     const minVec: Vec3 = @splat(min);
     const maxVec: Vec3 = @splat(max);
 

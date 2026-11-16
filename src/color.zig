@@ -8,14 +8,14 @@ pub const Color = Vec3;
 const intensity: Interval = .{ .min = 0.000, .max = 0.999 };
 
 pub fn write(c: Color, writer: *std.Io.Writer) !void {
-    const ir = @trunc(256 * intensity.clamp(linear_to_gamma(c[0])));
-    const ig = @trunc(256 * intensity.clamp(linear_to_gamma(c[1])));
-    const ib = @trunc(256 * intensity.clamp(linear_to_gamma(c[2])));
+    const ir = @trunc(256 * intensity.clamp(linearToGamma(c[0])));
+    const ig = @trunc(256 * intensity.clamp(linearToGamma(c[1])));
+    const ib = @trunc(256 * intensity.clamp(linearToGamma(c[2])));
 
     try writer.print("{d} {d} {d}\n", .{ ir, ig, ib });
 }
 
-fn linear_to_gamma(linear: f64) f64 {
+fn linearToGamma(linear: f64) f64 {
     if (linear > 0) return @sqrt(linear);
     return 0;
 }
