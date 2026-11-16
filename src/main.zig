@@ -11,8 +11,16 @@ pub fn main(init: std.process.Init) !void {
     const aspect_ratio: f32 = 16.0 / 9.0;
     const image_width = 400;
     const samples_per_pixel = 100;
+    const max_depth = 50;
 
-    const camera: Camera = .init(rand, .{ 0, 0, 0 }, aspect_ratio, image_width, samples_per_pixel);
+    const camera: Camera = .init(
+        rand,
+        .{ 0, 0, 0 },
+        aspect_ratio,
+        image_width,
+        samples_per_pixel,
+        max_depth,
+    );
 
     var world: HittableList(Hittable) = try .init(init.gpa, 2);
     const hittable = &world.interface;
@@ -43,4 +51,6 @@ pub fn main(init: std.process.Init) !void {
 
 test main {
     _ = @import("vec3.zig");
+    _ = @import("SimdPcg32.zig");
+    _ = @import("SimdXoshiro256.zig");
 }

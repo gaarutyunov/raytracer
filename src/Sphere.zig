@@ -10,10 +10,10 @@ const Vec3 = vec.Vec3;
 const Sphere = @This();
 
 center: Point3,
-radius: f32,
+radius: f64,
 interface: Hittable,
 
-pub fn init(center: Point3, radius: f32) Sphere {
+pub fn init(center: Point3, radius: f64) Sphere {
     return .{
         .center = center,
         .radius = @max(0, radius),

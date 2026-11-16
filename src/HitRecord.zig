@@ -5,10 +5,10 @@ const Self = @This();
 
 p: vec.Point3,
 normal: vec.Vec3,
-t: f32,
+t: f64,
 front_face: bool,
 
-pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f32, ray: Ray) Self {
+pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f64, ray: Ray) Self {
     const front_face = vec.dot(ray.direction, outward_normal) < 0;
     return .{
         .p = p,

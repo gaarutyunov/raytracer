@@ -15,21 +15,29 @@ center: Point3,
 pixel00_loc: Point3,
 pixel_delta_u: Vec3,
 pixel_delta_v: Vec3,
-pixel_samples_scale: f32,
+pixel_samples_scale: f64,
 rand: std.Random,
-samples_per_pixel: u32 = 10,
+samples_per_pixel: u32,
+max_depth: u32,
 
-pub fn init(rand: std.Random, center: Point3, aspect_ratio: f32, image_width: u32, samples_per_pixel: u32) Self {
-    const image_height: u32 = @max(1, @as(u32, @trunc(@as(f32, @floatFromInt(image_width)) / aspect_ratio)));
+pub fn init(
+    rand: std.Random,
+    center: Point3,
+    aspect_ratio: f64,
+    image_width: u32,
+    samples_per_pixel: u32,
+    max_depth: u32,
+) Self {
+    const image_height: u32 = @max(1, @as(u32, @trunc(@as(f64, @floatFromInt(image_width)) / aspect_ratio)));
     const focal_length = 1.0;
     const viewport_height = 2.0;
-    const viewport_width = viewport_height * @as(f32, @floatFromInt(image_width)) / @as(f32, @floatFromInt(image_height));
+    const viewport_width = viewport_height * @as(f64, @floatFromInt(image_width)) / @as(f64, @floatFromInt(image_height));
 
     const viewport_u: Vec3 = .{ viewport_width, 0, 0 };
     const viewport_v: Vec3 = .{ 0, -viewport_height, 0 };
 
-    const pixel_delta_u = viewport_u / @as(Vec3, @splat(@as(f32, @floatFromInt(image_width))));
-    const pixel_delta_v = viewport_v / @as(Vec3, @splat(@as(f32, @floatFromInt(image_height))));
+    const pixel_delta_u = viewport_u / @as(Vec3, @splat(@as(f64, @floatFromInt(image_width))));
+    const pixel_delta_v = viewport_v / @as(Vec3, @splat(@as(f64, @floatFromInt(image_height))));
 
     const viewport_upper_left = center - Vec3{ 0, 0, focal_length } -
         @as(Vec3, @splat(0.5)) * viewport_u - @as(Vec3, @splat(0.5)) * viewport_v;
@@ -43,14 +51,18 @@ pub fn init(rand: std.Random, center: Point3, aspect_ratio: f32, image_width: u3
         .image_width = image_width,
         .image_height = image_height,
         .samples_per_pixel = samples_per_pixel,
-        .pixel_samples_scale = 1.0 / @as(f32, @floatFromInt(samples_per_pixel)),
+        .pixel_samples_scale = 1.0 / @as(f64, @floatFromInt(samples_per_pixel)),
         .rand = rand,
+        .max_depth = max_depth,
     };
 }
 
-fn ray_color(r: Ray, world: *const Hittable) Color {
-    if (world.hit(r, .{ .min = 0, .max = std.math.inf(f32) })) |rec| {
-        return @as(Vec3, @splat(0.5)) * (rec.normal + Color{ 1, 1, 1 });
+fn ray_color(self: Self, r: Ray, world: *const Hittable, depth: u32) Color {
+    if (depth <= 0) return .{ 0, 0, 0 };
+
+    if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
+        const direction = rec.normal + vec.random_unit(self.rand);
+        return @as(Vec3, @splat(0.5)) * self.ray_color(.init(rec.p, direction), world, depth - 1);
     }
     const unit_dir = vec.unit(r.direction);
     const a: Vec3 = @splat(0.5 * unit_dir[1] + 1.0);
@@ -68,7 +80,7 @@ pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger
             var pixel_color: color.Color = .{ 0, 0, 0 };
 
             for (0..self.samples_per_pixel) |_| {
-                pixel_color += ray_color(self.get_ray(i, j), world);
+                pixel_color += self.ray_color(self.get_ray(i, j), world, self.max_depth);
             }
 
             try color.write(pixel_color * @as(Vec3, @splat(self.pixel_samples_scale)), writer);
@@ -77,14 +89,14 @@ pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger
 }
 
 fn sample_square(self: Self) Vec3 {
-    return .{ self.rand.float(f32) - 0.5, self.rand.float(f32) - 0.5, 0 };
+    return .{ self.rand.float(f64) - 0.5, self.rand.float(f64) - 0.5, 0 };
 }
 
 fn get_ray(self: Self, i: usize, j: usize) Ray {
     const offset = self.sample_square();
     const pixel_sample = self.pixel00_loc +
-        @as(Vec3, @splat(@as(f32, @floatFromInt(i)) + offset[0])) * self.pixel_delta_u +
-        @as(Vec3, @splat(@as(f32, @floatFromInt(j)) + offset[1])) * self.pixel_delta_v;
+        @as(Vec3, @splat(@as(f64, @floatFromInt(i)) + offset[0])) * self.pixel_delta_u +
+        @as(Vec3, @splat(@as(f64, @floatFromInt(j)) + offset[1])) * self.pixel_delta_v;
 
     return .init(self.center, pixel_sample - self.center);
 }

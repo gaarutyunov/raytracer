@@ -21,6 +21,20 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run rtx");
     run_step.dependOn(&run_exe.step);
 
+    // Benchmarks are only meaningful optimized, so ignore -Doptimize here.
+    const bench_mod = b.createModule(.{
+        .root_source_file = b.path("src/bench.zig"),
+        .target = target,
+        .optimize = .ReleaseFast,
+    });
+    const bench_exe = b.addExecutable(.{
+        .name = "bench",
+        .root_module = bench_mod,
+    });
+    const run_bench = b.addRunArtifact(bench_exe);
+    const bench_step = b.step("bench", "Run RNG benchmarks (ReleaseFast)");
+    bench_step.dependOn(&run_bench.step);
+
     const test_main = b.addTest(.{
         .root_module = main_mod,
     });
