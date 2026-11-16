@@ -15,8 +15,11 @@ center: Point3,
 pixel00_loc: Point3,
 pixel_delta_u: Vec3,
 pixel_delta_v: Vec3,
+pixel_samples_scale: f32,
+rand: std.Random,
+samples_per_pixel: u32 = 10,
 
-pub fn init(center: Point3, aspect_ratio: f32, image_width: u32) Self {
+pub fn init(rand: std.Random, center: Point3, aspect_ratio: f32, image_width: u32, samples_per_pixel: u32) Self {
     const image_height: u32 = @max(1, @as(u32, @trunc(@as(f32, @floatFromInt(image_width)) / aspect_ratio)));
     const focal_length = 1.0;
     const viewport_height = 2.0;
@@ -39,6 +42,9 @@ pub fn init(center: Point3, aspect_ratio: f32, image_width: u32) Self {
         .pixel_delta_u = pixel_delta_u,
         .image_width = image_width,
         .image_height = image_height,
+        .samples_per_pixel = samples_per_pixel,
+        .pixel_samples_scale = 1.0 / @as(f32, @floatFromInt(samples_per_pixel)),
+        .rand = rand,
     };
 }
 
@@ -59,12 +65,26 @@ pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger
         try logger.print("\rScanlines remaining: {d}", .{self.image_height - j});
         try logger.flush();
         for (0..self.image_width) |i| {
-            const pixel_center = self.pixel00_loc + @as(Vec3, @splat(@floatFromInt(i))) * self.pixel_delta_u +
-                @as(Vec3, @splat(@floatFromInt(j))) * self.pixel_delta_v;
-            const ray_direction = pixel_center - self.center;
-            const ray: Ray = .init(self.center, ray_direction);
-            const c: Color = ray_color(ray, world);
-            try color.write(c, writer);
+            var pixel_color: color.Color = .{ 0, 0, 0 };
+
+            for (0..self.samples_per_pixel) |_| {
+                pixel_color += ray_color(self.get_ray(i, j), world);
+            }
+
+            try color.write(pixel_color * @as(Vec3, @splat(self.pixel_samples_scale)), writer);
         }
     }
+}
+
+fn sample_square(self: Self) Vec3 {
+    return .{ self.rand.float(f32) - 0.5, self.rand.float(f32) - 0.5, 0 };
+}
+
+fn get_ray(self: Self, i: usize, j: usize) Ray {
+    const offset = self.sample_square();
+    const pixel_sample = self.pixel00_loc +
+        @as(Vec3, @splat(@as(f32, @floatFromInt(i)) + offset[0])) * self.pixel_delta_u +
+        @as(Vec3, @splat(@as(f32, @floatFromInt(j)) + offset[1])) * self.pixel_delta_v;
+
+    return .init(self.center, pixel_sample - self.center);
 }

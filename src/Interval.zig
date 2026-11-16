@@ -19,3 +19,9 @@ pub fn contains(self: Self, x: f32) bool {
 pub fn surrounds(self: Self, x: f32) bool {
     return self.min < x and x < self.max;
 }
+
+pub fn clamp(self: Self, x: f32) f32 {
+    if (x < self.min) return self.min;
+    if (x > self.max) return self.max;
+    return x;
+}
