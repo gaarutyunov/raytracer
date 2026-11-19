@@ -1,30 +1,36 @@
 const std = @import("std");
 const Hittable = @import("Hittable.zig");
-const HittableList = @import("HittableList.zig").HittableList;
+const HittableList = @import("HittableList.zig");
 const Sphere = @import("Sphere.zig");
 const Camera = @import("Camera.zig");
 const Lambertian = @import("Lambertian.zig");
 const Metal = @import("Metal.zig");
+const Dielectric = @import("Dieletric.zig");
+const Rng = @import("Rng.zig");
 
 pub fn main(init: std.process.Init) !void {
-    const rng: std.Random.IoSource = .{ .io = init.io };
-    const rand: std.Random = rng.interface();
+    var src: Rng.Default = .init(.init(42));
 
     const aspect_ratio: f32 = 16.0 / 9.0;
     const image_width = 400;
     const samples_per_pixel = 100;
     const max_depth = 50;
 
-    const camera: Camera = .init(
-        rand,
-        .{ 0, 0, 0 },
-        aspect_ratio,
-        image_width,
-        samples_per_pixel,
-        max_depth,
-    );
+    const camera: Camera = try .init(init.gpa, src.rng(), max_depth, samples_per_pixel, .{
+        .image_width = image_width,
+        .aspect_ratio = aspect_ratio,
+    }, .{
+        .vfov = 20,
+        .look_from = .{ -2, 2, 1 },
+        .look_at = .{ 0, 0, -1 },
+        .vup = .{ 0, 1, 0 },
+    }, .{
+        .defocus_angle = 10.0,
+        .focus_distance = 3.4,
+    });
+    defer camera.deinit(init.gpa);
 
-    var world: HittableList(Hittable) = try .init(init.gpa, 2);
+    var world: HittableList = try .init(init.gpa, 10);
     const hittable = &world.interface;
     defer world.deinit(init.gpa);
     // left
@@ -33,7 +39,16 @@ pub fn main(init: std.process.Init) !void {
         &Sphere.init(
             .{ -1.0, 0, -1.0 },
             0.5,
-            &Metal.init(.{ 0.8, 0.8, 0.8 }, rand, 0.3).interface,
+            &Dielectric.init(src.rng(), 1.5).interface,
+        ).interface,
+    );
+    // bubble
+    try world.add(
+        init.gpa,
+        &Sphere.init(
+            .{ -1.0, 0, -1.0 },
+            0.4,
+            &Dielectric.init(src.rng(), 1.0 / 1.5).interface,
         ).interface,
     );
     // center
@@ -42,7 +57,7 @@ pub fn main(init: std.process.Init) !void {
         &Sphere.init(
             .{ 0, 0, -1.2 },
             0.5,
-            &Lambertian.init(.{ 0.1, 0.2, 0.5 }, rand).interface,
+            &Lambertian.init(.{ 0.1, 0.2, 0.5 }, src.rng()).interface,
         ).interface,
     );
     // right
@@ -51,7 +66,7 @@ pub fn main(init: std.process.Init) !void {
         &Sphere.init(
             .{ 1.0, 0, -1.0 },
             0.5,
-            &Metal.init(.{ 0.2, 0.6, 0.2 }, rand, 1.0).interface,
+            &Metal.init(.{ 0.2, 0.6, 0.2 }, src.rng(), 1.0).interface,
         ).interface,
     );
     // ground
@@ -60,7 +75,7 @@ pub fn main(init: std.process.Init) !void {
         &Sphere.init(
             .{ 0, -100.5, -1 },
             100,
-            &Lambertian.init(.{ 0.8, 0.8, 0 }, rand).interface,
+            &Lambertian.init(.{ 0.8, 0.8, 0 }, src.rng()).interface,
         ).interface,
     );
 

@@ -7,9 +7,21 @@ const Self = @This();
 vtable: *const VTable,
 
 pub const VTable = struct {
-    scatter: *const fn (self: *const Self, r_in: Ray, point: vec.Point3, normal: vec.Vec3) ?struct { Ray, color.Color },
+    scatter: *const fn (
+        self: *const Self,
+        r_in: Ray,
+        point: vec.Point3,
+        normal: vec.Vec3,
+        front_face: bool,
+    ) ?struct { Ray, color.Color },
 };
 
-pub fn scatter(self: *const Self, r_in: Ray, point: vec.Point3, normal: vec.Vec3) ?struct { Ray, color.Color } {
-    return self.vtable.scatter(self, r_in, point, normal);
+pub fn scatter(
+    self: *const Self,
+    r_in: Ray,
+    point: vec.Point3,
+    normal: vec.Vec3,
+    front_face: bool,
+) ?struct { Ray, color.Color } {
+    return self.vtable.scatter(self, r_in, point, normal, front_face);
 }

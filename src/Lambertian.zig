@@ -4,14 +4,15 @@ const Ray = @import("Ray.zig");
 const HitRecord = @import("HitRecord.zig");
 const vec = @import("vec3.zig");
 const std = @import("std");
+const Rng = @import("Rng.zig");
 
 const Self = @This();
 
 albedo: Color,
 interface: Material,
-rand: std.Random,
+rand: *Rng,
 
-pub fn init(albedo: Color, rand: std.Random) Self {
+pub fn init(albedo: Color, rand: *Rng) Self {
     return .{
         .albedo = albedo,
         .interface = .{ .vtable = &.{ .scatter = scatter } },
@@ -19,7 +20,7 @@ pub fn init(albedo: Color, rand: std.Random) Self {
     };
 }
 
-fn scatter(material: *const Material, _: Ray, point: vec.Point3, normal: vec.Vec3) ?struct { Ray, Color } {
+fn scatter(material: *const Material, _: Ray, point: vec.Point3, normal: vec.Vec3, _: bool) ?struct { Ray, Color } {
     const self: *const Self = @alignCast(@fieldParentPtr("interface", material));
 
     var scatter_direction = normal + vec.randomUnit(self.rand);
