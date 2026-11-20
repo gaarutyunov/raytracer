@@ -3,6 +3,8 @@ const Ray = @import("Ray.zig");
 const Hittable = @import("Hittable.zig");
 const vec = @import("vec3.zig");
 const color = @import("color.zig");
+const Interval = @import("Interval.zig");
+const HitRecord = @import("HitRecord.zig");
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
 const Color = color.Color;
@@ -85,7 +87,7 @@ pub fn init(
     };
 }
 
-pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: *const Hittable, concurrency: usize) !void {
+pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hittable, concurrency: usize) !void {
     var buffer: [4096]u8 = undefined;
     var errbuffer: [256]u8 = undefined;
 
@@ -115,7 +117,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: *const Hitt
         result: []color.Color,
         camera: Self,
         progress: std.Progress.Node,
-        world: *const Hittable,
+        world: []*const Hittable,
         row: usize,
 
         pub fn run(ctx: *@This()) !void {
@@ -164,10 +166,10 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: *const Hitt
     try writer.flush();
 }
 
-fn rayColor(self: Self, rand: std.Random, r: Ray, world: *const Hittable, depth: u32) Color {
+fn rayColor(self: Self, rand: std.Random, r: Ray, world: []*const Hittable, depth: u32) Color {
     if (depth <= 0) return .{ 0, 0, 0 };
 
-    if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
+    if (hit(world, r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
         if (rec.mat.scatter(rand, r, rec.p, rec.normal, rec.front_face)) |srec| {
             const scattered, const attenuation = srec;
             return attenuation * self.rayColor(rand, scattered, world, depth - 1);
@@ -178,6 +180,20 @@ fn rayColor(self: Self, rand: std.Random, r: Ray, world: *const Hittable, depth:
     const a: Vec3 = @splat(0.5 * unit_dir[1] + 1.0);
 
     return (@as(Vec3, @splat(1.0)) - a) * Color{ 1.0, 1.0, 1.0 } + a * Color{ 0.5, 0.7, 1.0 };
+}
+
+fn hit(objects: []*const Hittable, ray: Ray, ray_t: Interval) ?HitRecord {
+    var rec: ?HitRecord = null;
+    var closest = ray_t.max;
+
+    for (objects) |elem| {
+        if (elem.hit(ray, .{ .min = ray_t.min, .max = closest })) |r| {
+            closest = r.t;
+            rec = r;
+        }
+    }
+
+    return rec;
 }
 
 fn getRay(self: Self, rand: std.Random, i: usize, j: usize) Ray {

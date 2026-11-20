@@ -1,6 +1,5 @@
 const std = @import("std");
 const Hittable = @import("Hittable.zig");
-const HittableList = @import("HittableList.zig");
 const Sphere = @import("Sphere.zig");
 const Camera = @import("Camera.zig");
 const vec = @import("vec3.zig");
@@ -12,20 +11,17 @@ pub fn main(init: std.process.Init) !void {
 
     const gpa = init.arena.allocator();
 
-    var world: HittableList = try .init(gpa, 1000);
-    const hittable = &world.interface;
+    var world: std.ArrayList(*const Hittable) = try .initCapacity(gpa, 1000);
 
-    try world.add(gpa, &Sphere.init(
+    try world.append(gpa, &Sphere.init(
         .{ 0, -1000, 0 },
         1000,
         .{ .lambertian = .{ .albedo = .{ 0.5, 0.5, 0.5 } } },
     ).interface);
 
-    const n: u32 = 22;
-
-    for (0..n) |i| {
+    for (0..22) |i| {
         const a: f64 = @floatFromInt(@as(i64, @intCast(i)) - 11);
-        for (0..n) |j| {
+        for (0..22) |j| {
             const b: f64 = @floatFromInt(@as(i64, @intCast(j)) - 11);
             const choose_mat = rand.float(f64);
             const center: vec.Point3 = .{
@@ -35,7 +31,7 @@ pub fn main(init: std.process.Init) !void {
             };
 
             if (vec.length(center - vec.Point3{ 4, 0.2, 0 }) > 0.9) {
-                try world.add(gpa, &Sphere.init(
+                try world.append(gpa, &Sphere.init(
                     center,
                     0.2,
                     if (choose_mat < 0.8)
@@ -62,17 +58,17 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    try world.add(gpa, &Sphere.init(
+    try world.append(gpa, &Sphere.init(
         .{ 0, 1, 0 },
         1.0,
         .{ .dielectric = .{ .refraction_index = 1.5 } },
     ).interface);
-    try world.add(gpa, &Sphere.init(
+    try world.append(gpa, &Sphere.init(
         .{ -4, 1, 0 },
         1.0,
         .{ .lambertian = .{ .albedo = .{ 0.4, 0.2, 0.1 } } },
     ).interface);
-    try world.add(gpa, &Sphere.init(
+    try world.append(gpa, &Sphere.init(
         .{ 4, 1, 0 },
         1.0,
         .{ .metal = .{ .albedo = .{ 0.7, 0.6, 0.5 }, .fuzz = 0.0 } },
@@ -97,7 +93,7 @@ pub fn main(init: std.process.Init) !void {
         },
     );
 
-    try camera.render(gpa, init.io, hittable, 4);
+    try camera.render(gpa, init.io, world.items, 4);
 }
 
 test main {
