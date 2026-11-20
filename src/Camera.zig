@@ -6,7 +6,6 @@ const color = @import("color.zig");
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
 const Color = color.Color;
-const Rng = @import("Rng.zig");
 
 const Self = @This();
 
@@ -23,7 +22,7 @@ pub const Orientation = struct {
 };
 
 pub const Focus = struct {
-    defocus_angle: u32,
+    defocus_angle: f64,
     focus_distance: f64,
 };
 
@@ -34,17 +33,13 @@ pixel00_loc: Point3,
 pixel_delta_u: Vec3,
 pixel_delta_v: Vec3,
 pixel_samples_scale: f64,
-rand: *Rng,
 samples_per_pixel: u32,
 max_depth: u32,
-buffer: []f64,
 defocus_disc_u: Vec3,
 defocus_disc_v: Vec3,
-defocus_angle: u32,
+defocus_angle: f64,
 
 pub fn init(
-    gpa: std.mem.Allocator,
-    rand: *Rng,
     max_depth: u32,
     samples_per_pixel: u32,
     size: Size,
@@ -72,7 +67,7 @@ pub fn init(
         @as(Vec3, @splat(0.5)) * viewport_u - @as(Vec3, @splat(0.5)) * viewport_v;
     const pixel00_loc = viewport_upper_left + @as(Vec3, @splat(0.5)) * (pixel_delta_u + pixel_delta_v);
 
-    const defocus_radius = focus.focus_distance * std.math.tan(degreesToRadians(focus.defocus_angle / 2));
+    const defocus_radius = focus.focus_distance * std.math.tan(degreesToRadians(@trunc(focus.defocus_angle / 2)));
 
     return .{
         .pixel00_loc = pixel00_loc,
@@ -83,22 +78,99 @@ pub fn init(
         .image_height = image_height,
         .samples_per_pixel = samples_per_pixel,
         .pixel_samples_scale = 1.0 / @as(f64, @floatFromInt(samples_per_pixel)),
-        .rand = rand,
         .max_depth = max_depth,
-        .buffer = try gpa.alloc(f64, size.image_width * samples_per_pixel * 2),
         .defocus_disc_u = u * @as(Vec3, @splat(defocus_radius)),
         .defocus_disc_v = v * @as(Vec3, @splat(defocus_radius)),
         .defocus_angle = focus.defocus_angle,
     };
 }
 
-fn rayColor(self: Self, r: Ray, world: *const Hittable, depth: u32) Color {
+pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: *const Hittable, concurrency: usize) !void {
+    var buffer: [4096]u8 = undefined;
+    var errbuffer: [256]u8 = undefined;
+
+    const stdout = std.Io.File.stdout();
+    defer stdout.close(io);
+    var stdout_writer = stdout.writer(io, &buffer);
+    const writer = &stdout_writer.interface;
+
+    try writer.print("P3\n{d} {d}\n255\n", .{ self.image_width, self.image_height });
+
+    var group: std.Io.Group = .init;
+    var semaphore: std.Io.Semaphore = .{ .permits = concurrency };
+    var result: []color.Color = try gpa.alloc(color.Color, self.image_width * self.image_height);
+    _ = &result;
+
+    const pr = std.Progress.start(io, .{
+        .draw_buffer = &errbuffer,
+        .estimated_total_items = self.image_height,
+        .root_name = "raytracing",
+    });
+
+    defer pr.end();
+
+    const Context = struct {
+        io: std.Io,
+        semaphore: *std.Io.Semaphore,
+        result: []color.Color,
+        camera: Self,
+        progress: std.Progress.Node,
+        world: *const Hittable,
+        row: usize,
+
+        pub fn run(ctx: *@This()) !void {
+            try ctx.semaphore.wait(ctx.io);
+            defer ctx.semaphore.post(ctx.io);
+            defer ctx.progress.completeOne();
+
+            var prng: std.Random.DefaultPrng = .init(42);
+            const rand = prng.random();
+
+            for (0..ctx.camera.image_width) |i| {
+                var pixel_color: color.Color = .{ 0, 0, 0 };
+
+                for (0..ctx.camera.samples_per_pixel) |_| {
+                    pixel_color += ctx.camera.rayColor(
+                        rand,
+                        ctx.camera.getRay(rand, i, ctx.row),
+                        ctx.world,
+                        ctx.camera.max_depth,
+                    );
+                }
+
+                ctx.result[i] = pixel_color * @as(Vec3, @splat(ctx.camera.pixel_samples_scale));
+            }
+        }
+    };
+
+    for (0..self.image_height) |j| {
+        var ctx: Context = .{
+            .io = io,
+            .progress = pr,
+            .semaphore = &semaphore,
+            .world = world,
+            .camera = self,
+            .result = result[self.image_width * j .. self.image_width * j + self.image_width],
+            .row = j,
+        };
+        try group.concurrent(io, Context.run, .{&ctx});
+    }
+
+    try group.await(io);
+
+    for (result) |value| {
+        try color.write(value, writer);
+    }
+    try writer.flush();
+}
+
+fn rayColor(self: Self, rand: std.Random, r: Ray, world: *const Hittable, depth: u32) Color {
     if (depth <= 0) return .{ 0, 0, 0 };
 
     if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
-        if (rec.mat.scatter(r, rec.p, rec.normal, rec.front_face)) |srec| {
+        if (rec.mat.scatter(rand, r, rec.p, rec.normal, rec.front_face)) |srec| {
             const scattered, const attenuation = srec;
-            return attenuation * self.rayColor(scattered, world, depth - 1);
+            return attenuation * self.rayColor(rand, scattered, world, depth - 1);
         }
         return .{ 0, 0, 0 };
     }
@@ -108,50 +180,20 @@ fn rayColor(self: Self, r: Ray, world: *const Hittable, depth: u32) Color {
     return (@as(Vec3, @splat(1.0)) - a) * Color{ 1.0, 1.0, 1.0 } + a * Color{ 0.5, 0.7, 1.0 };
 }
 
-pub fn render(self: Self, world: *const Hittable, writer: *std.Io.Writer, logger: *std.Io.Writer) !void {
-    try writer.print("P3\n{d} {d}\n255\n", .{ self.image_width, self.image_height });
-
-    var buffer = self.buffer;
-    _ = &buffer;
-
-    for (0..self.image_height) |j| {
-        try logger.print("\rScanlines remaining: {d}", .{self.image_height - j});
-        try logger.flush();
-
-        self.rand.fillF64(buffer);
-        for (0..self.image_width) |i| {
-            var pixel_color: color.Color = .{ 0, 0, 0 };
-
-            for (0..self.samples_per_pixel) |s| {
-                const offset = (i * self.samples_per_pixel + s) * 2;
-                pixel_color += self.rayColor(
-                    self.getRay(i, j, buffer[offset], buffer[offset + 1]),
-                    world,
-                    self.max_depth,
-                );
-            }
-
-            try color.write(pixel_color * @as(Vec3, @splat(self.pixel_samples_scale)), writer);
-        }
-    }
-}
-
-fn getRay(self: Self, i: usize, j: usize, x: f64, y: f64) Ray {
+fn getRay(self: Self, rand: std.Random, i: usize, j: usize) Ray {
+    const x = rand.float(f64) - 0.5;
+    const y = rand.float(f64) - 0.5;
     const pixel_sample = self.pixel00_loc +
         @as(Vec3, @splat(@as(f64, @floatFromInt(i)) + x)) * self.pixel_delta_u +
         @as(Vec3, @splat(@as(f64, @floatFromInt(j)) + y)) * self.pixel_delta_v;
-    const ray_origin = if (self.defocus_angle <= 0) self.center else self.defocusDiskSample();
+    const ray_origin = if (self.defocus_angle <= 0) self.center else self.defocusDiskSample(rand);
 
     return .init(ray_origin, pixel_sample - ray_origin);
 }
 
-fn defocusDiskSample(self: Self) Point3 {
-    const p = vec.randomInUnitDisk(self.rand);
+fn defocusDiskSample(self: Self, rand: std.Random) Point3 {
+    const p = vec.randomInUnitDisk(rand);
     return self.center + @as(Vec3, @splat(p[0])) * self.defocus_disc_u + @as(Vec3, @splat(p[1])) * self.defocus_disc_v;
-}
-
-pub fn deinit(self: Self, gpa: std.mem.Allocator) void {
-    gpa.free(self.buffer);
 }
 
 fn degreesToRadians(degrees: u32) f64 {

@@ -1,6 +1,6 @@
 const vec = @import("vec3.zig");
 const Ray = @import("Ray.zig");
-const Material = @import("Material.zig");
+const Material = @import("Material.zig").Material;
 
 const Self = @This();
 
@@ -8,9 +8,9 @@ p: vec.Point3,
 normal: vec.Vec3,
 t: f64,
 front_face: bool,
-mat: *const Material,
+mat: Material,
 
-pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f64, ray: Ray, mat: *const Material) Self {
+pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f64, ray: Ray, mat: Material) Self {
     const front_face = vec.dot(ray.direction, outward_normal) < 0;
     return .{
         .p = p,

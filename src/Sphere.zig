@@ -4,7 +4,7 @@ const Ray = @import("Ray.zig");
 const HitRecord = @import("HitRecord.zig");
 const Hittable = @import("Hittable.zig");
 const Interval = @import("Interval.zig");
-const Material = @import("Material.zig");
+const Material = @import("Material.zig").Material;
 const Point3 = vec.Point3;
 const Vec3 = vec.Vec3;
 
@@ -13,9 +13,9 @@ const Sphere = @This();
 center: Point3,
 radius: f64,
 interface: Hittable,
-mat: *const Material,
+mat: Material,
 
-pub fn init(center: Point3, radius: f64, mat: *const Material) Sphere {
+pub fn init(center: Point3, radius: f64, mat: Material) Sphere {
     return .{
         .center = center,
         .radius = @max(0, radius),

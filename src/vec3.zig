@@ -1,5 +1,4 @@
 const std = @import("std");
-const Rng = @import("Rng.zig");
 
 pub const Vec3 = @Vector(3, f64);
 pub const Point3 = Vec3;
@@ -40,7 +39,7 @@ pub fn isNearZero(u: Vec3) bool {
     return @reduce(.And, @abs(u) < s);
 }
 
-pub fn randomUnit(rand: *Rng) Vec3 {
+pub fn randomUnit(rand: std.Random) Vec3 {
     while (true) {
         const p = randomRange(rand, -1, 1);
         const lensq = dot(p, p);
@@ -48,7 +47,7 @@ pub fn randomUnit(rand: *Rng) Vec3 {
     }
 }
 
-pub fn randomInUnitDisk(rand: *Rng) Vec3 {
+pub fn randomInUnitDisk(rand: std.Random) Vec3 {
     while (true) {
         var v = randomRange(rand, -1, 1);
         v[2] = 0;
@@ -58,7 +57,7 @@ pub fn randomInUnitDisk(rand: *Rng) Vec3 {
     }
 }
 
-pub fn randomOnHemisphere(rand: *Rng, normal: Vec3) Vec3 {
+pub fn randomOnHemisphere(rand: std.Random, normal: Vec3) Vec3 {
     const on_unit_sphere = randomUnit(rand);
     if (dot(on_unit_sphere, normal) > 0.0) {
         return on_unit_sphere;
@@ -67,11 +66,11 @@ pub fn randomOnHemisphere(rand: *Rng, normal: Vec3) Vec3 {
     return -on_unit_sphere;
 }
 
-pub fn random(rand: *Rng) Vec3 {
-    return rand.floatVec(3);
+pub fn random(rand: std.Random) Vec3 {
+    return .{ rand.float(f64), rand.float(f64), rand.float(f64) };
 }
 
-pub fn randomRange(rand: *Rng, min: f64, max: f64) Vec3 {
+pub fn randomRange(rand: std.Random, min: f64, max: f64) Vec3 {
     const minVec: Vec3 = @splat(min);
     const maxVec: Vec3 = @splat(max);
 
