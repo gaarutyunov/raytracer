@@ -93,9 +93,9 @@ pub fn main(init: std.process.Init) !void {
 
     const camera: Camera = try .init(
         50,
-        100,
+        500,
         .{
-            .image_width = 400,
+            .image_width = 1200,
             .aspect_ratio = 16.0 / 9.0,
         },
         .{
