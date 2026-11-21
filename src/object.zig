@@ -49,14 +49,27 @@ pub const Object = union(enum) {
             const outward_normal = (p - current_center) /
                 @as(Vec3, @splat(self.radius));
 
-            return .init(p, outward_normal, root, ray, self.material);
+            var rec: Hit = .init(p, outward_normal, root, ray, self.material);
+
+            rec.u, rec.v = point_to_uv(outward_normal);
+
+            return rec;
+        }
+
+        fn point_to_uv(p: Point3) struct { f64, f64 } {
+            const theta = std.math.acos(-p[1]); // 𝜃=arccos(−𝑦)
+            const phi = std.math.atan2(-p[2], p[0]) + std.math.pi; // 𝜙=atan2(−𝑧,𝑥)+𝜋
+            return .{
+                phi / (2 * std.math.pi), // 𝑢=𝜙/2𝜋
+                theta / std.math.pi, // 𝑣=𝜃/𝜋
+            };
         }
     },
 
     list: struct {
         const List = @This();
 
-        objects: []Object,
+        objects: []const Object,
         bbox: BoundingBox = .empty,
 
         pub fn bounding_box(self: List) BoundingBox {
@@ -106,7 +119,7 @@ pub const Object = union(enum) {
         }
     },
 
-    pub fn initList(objects: []Object) Object {
+    pub fn initList(objects: []const Object) Object {
         var bbox: BoundingBox = .empty;
 
         for (objects) |obj| {

@@ -9,8 +9,16 @@ normal: vec.Vec3,
 t: f64,
 front_face: bool,
 mat: Material,
+u: f64 = 0,
+v: f64 = 0,
 
-pub fn init(p: vec.Point3, outward_normal: vec.Vec3, t: f64, ray: Ray, mat: Material) Self {
+pub fn init(
+    p: vec.Point3,
+    outward_normal: vec.Vec3,
+    t: f64,
+    ray: Ray,
+    mat: Material,
+) Self {
     const front_face = vec.dot(ray.direction, outward_normal) < 0;
     return .{
         .p = p,

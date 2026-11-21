@@ -3,6 +3,7 @@ const Object = @import("object.zig").Object;
 const Camera = @import("Camera.zig");
 const vec = @import("vec.zig");
 const Material = @import("material.zig").Material;
+const Texture = @import("texture.zig").Texture;
 
 const Scene = struct {
     const Self = @This();
@@ -10,13 +11,20 @@ const Scene = struct {
     world: Object,
     camera: Camera,
 
-    pub fn initSpheres(gpa: std.mem.Allocator, rand: std.Random) !Self {
+    pub fn initBouncingSpheres(gpa: std.mem.Allocator, rand: std.Random) !Self {
         var world: std.ArrayList(Object) = try .initCapacity(gpa, 1000);
 
         try world.append(gpa, .initStaticSphere(
             .{ 0, -1000, 0 },
             1000,
-            .{ .lambertian = .{ .albedo = .{ 0.5, 0.5, 0.5 } } },
+            .initLambertian(.{
+                .texture = try .initChecker(
+                    gpa,
+                    0.32,
+                    .{ 0.2, 0.3, 0.1 },
+                    .{ 0.9, 0.9, 0.9 },
+                ),
+            }),
         ));
 
         for (0..22) |i| {
@@ -36,11 +44,9 @@ const Scene = struct {
                             center,
                             center + vec.Vec3{ 0, 0.5 * rand.float(f64), 0 },
                             0.2,
-                            .{
-                                .lambertian = .{
-                                    .albedo = vec.random(rand) * vec.random(rand),
-                                },
-                            },
+                            .initLambertian(
+                                .{ .color = vec.random(rand) * vec.random(rand) },
+                            ),
                         )
                     else if (choose_mat < 0.95)
                         .initStaticSphere(center, 0.2, .{
@@ -66,15 +72,26 @@ const Scene = struct {
         }
 
         try world.appendSlice(gpa, &.{
-            .initStaticSphere(.{ 0, 1, 0 }, 1.0, .{
-                .dielectric = .{ .refraction_index = 1.5 },
-            }),
-            .initStaticSphere(.{ -4, 1, 0 }, 1.0, .{
-                .lambertian = .{ .albedo = .{ 0.4, 0.2, 0.1 } },
-            }),
-            .initStaticSphere(.{ 4, 1, 0 }, 1.0, .{
-                .metal = .{ .albedo = .{ 0.7, 0.6, 0.5 }, .fuzz = 0.0 },
-            }),
+            .initStaticSphere(
+                .{ 0, 1, 0 },
+                1.0,
+                .{ .dielectric = .{ .refraction_index = 1.5 } },
+            ),
+            .initStaticSphere(
+                .{ -4, 1, 0 },
+                1.0,
+                .initLambertian(.{ .color = .{ 0.4, 0.2, 0.1 } }),
+            ),
+            .initStaticSphere(
+                .{ 4, 1, 0 },
+                1.0,
+                .{
+                    .metal = .{
+                        .albedo = .{ 0.7, 0.6, 0.5 },
+                        .fuzz = 0.0,
+                    },
+                },
+            ),
         });
 
         return .{
@@ -99,6 +116,49 @@ const Scene = struct {
             ),
         };
     }
+
+    pub fn initCheckeredSpheres(gpa: std.mem.Allocator) !Self {
+        const checker: Texture = try .initChecker(
+            gpa,
+            0.32,
+            .{ 0.2, 0.3, 0.1 },
+            .{ 0.9, 0.9, 0.9 },
+        );
+
+        var objects = try gpa.alloc(Object, 2);
+        objects[0] = .initStaticSphere(
+            .{ 0, -10, 0 },
+            10,
+            .initLambertian(.{ .texture = checker }),
+        );
+        objects[1] = .initStaticSphere(
+            .{ 0, 10, 0 },
+            10,
+            .initLambertian(.{ .texture = checker }),
+        );
+
+        return .{
+            .world = .initList(objects),
+            .camera = try .init(
+                50,
+                100,
+                .{
+                    .image_width = 400,
+                    .aspect_ratio = 16.0 / 9.0,
+                },
+                .{
+                    .vfov = 20,
+                    .look_from = .{ 13, 2, 3 },
+                    .look_at = .{ 0, 0, 0 },
+                    .vup = .{ 0, 1, 0 },
+                },
+                .{
+                    .defocus_angle = 0,
+                    .focus_distance = 10.0,
+                },
+            ),
+        };
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -107,9 +167,34 @@ pub fn main(init: std.process.Init) !void {
 
     const gpa = init.arena.allocator();
 
-    const scene: Scene = try .initSpheres(gpa, rand);
+    var iterArgs = try init.minimal.args.iterateAllocator(gpa);
 
-    try scene.camera.render(gpa, init.io, scene.world, 4);
+    var scene_kind: enum {
+        bouncing_spheres,
+        checkered_spheres,
+    } = .bouncing_spheres;
+
+    while (iterArgs.next()) |arg| {
+        var name_and_value = std.mem.splitScalar(u8, arg, '=');
+        const name = name_and_value.next().?;
+
+        if (std.mem.eql(u8, name, "--scene")) {
+            const value = name_and_value.next() orelse "1";
+
+            if (std.mem.eql(u8, value, "1")) {
+                scene_kind = .bouncing_spheres;
+            } else if (std.mem.eql(u8, value, "2")) {
+                scene_kind = .checkered_spheres;
+            }
+        }
+    }
+
+    const scene: Scene = switch (scene_kind) {
+        .bouncing_spheres => try .initBouncingSpheres(gpa, rand),
+        .checkered_spheres => try .initCheckeredSpheres(gpa),
+    };
+
+    try scene.camera.render(gpa, init.io, scene.world, try std.Thread.getCpuCount());
 }
 
 test main {

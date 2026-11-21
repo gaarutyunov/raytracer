@@ -86,7 +86,13 @@ pub fn init(
     };
 }
 
-pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, concurrency: usize) !void {
+pub fn render(
+    self: Self,
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    world: Object,
+    concurrency: usize,
+) !void {
     var buffer: [4096]u8 = undefined;
     var errbuffer: [256]u8 = undefined;
 
@@ -169,7 +175,7 @@ fn rayColor(self: Self, rand: std.Random, r: Ray, world: Object, depth: u32) Col
     if (depth <= 0) return .{ 0, 0, 0 };
 
     if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
-        if (rec.mat.scatter(rand, r, rec.p, rec.normal, rec.front_face)) |srec| {
+        if (rec.mat.scatter(rand, r, rec)) |srec| {
             const scattered, const attenuation = srec;
             return attenuation * self.rayColor(rand, scattered, world, depth - 1);
         }
