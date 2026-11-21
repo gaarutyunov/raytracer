@@ -159,6 +159,41 @@ const Scene = struct {
             ),
         };
     }
+
+    pub fn initEarth(gpa: std.mem.Allocator) !Self {
+        return .{
+            .world = .initStaticSphere(
+                .{ 0, 0, 0 },
+                2,
+                .initLambertian(
+                    .{
+                        .texture = try .loadImage(
+                            gpa,
+                            @embedFile("assets/earthmap.jpg"),
+                        ),
+                    },
+                ),
+            ),
+            .camera = try .init(
+                50,
+                100,
+                .{
+                    .image_width = 400,
+                    .aspect_ratio = 16.0 / 9.0,
+                },
+                .{
+                    .vfov = 20,
+                    .look_from = .{ 13, 2, 3 },
+                    .look_at = .{ 0, 0, 0 },
+                    .vup = .{ 0, 1, 0 },
+                },
+                .{
+                    .defocus_angle = 0,
+                    .focus_distance = 10.0,
+                },
+            ),
+        };
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -172,7 +207,14 @@ pub fn main(init: std.process.Init) !void {
     var scene_kind: enum {
         bouncing_spheres,
         checkered_spheres,
+        earth,
     } = .bouncing_spheres;
+
+    const map: std.StaticStringMap(@TypeOf(scene_kind)) = .initComptime(&.{
+        .{ "1", .bouncing_spheres },
+        .{ "2", .checkered_spheres },
+        .{ "3", .earth },
+    });
 
     while (iterArgs.next()) |arg| {
         var name_and_value = std.mem.splitScalar(u8, arg, '=');
@@ -181,17 +223,14 @@ pub fn main(init: std.process.Init) !void {
         if (std.mem.eql(u8, name, "--scene")) {
             const value = name_and_value.next() orelse "1";
 
-            if (std.mem.eql(u8, value, "1")) {
-                scene_kind = .bouncing_spheres;
-            } else if (std.mem.eql(u8, value, "2")) {
-                scene_kind = .checkered_spheres;
-            }
+            scene_kind = map.get(value).?;
         }
     }
 
     const scene: Scene = switch (scene_kind) {
         .bouncing_spheres => try .initBouncingSpheres(gpa, rand),
         .checkered_spheres => try .initCheckeredSpheres(gpa),
+        .earth => try .initEarth(gpa),
     };
 
     try scene.camera.render(gpa, init.io, scene.world, try std.Thread.getCpuCount());
@@ -199,4 +238,5 @@ pub fn main(init: std.process.Init) !void {
 
 test main {
     _ = @import("vec.zig");
+    _ = @import("texture.zig");
 }
