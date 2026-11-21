@@ -1,8 +1,8 @@
 const std = @import("std");
-const Object = @import("Object.zig").Object;
+const Object = @import("object.zig").Object;
 const Camera = @import("Camera.zig");
-const vec = @import("vec3.zig");
-const Material = @import("Material.zig").Material;
+const vec = @import("vec.zig");
+const Material = @import("material.zig").Material;
 
 const Scene = struct {
     const Self = @This();
@@ -113,5 +113,5 @@ pub fn main(init: std.process.Init) !void {
 }
 
 test main {
-    _ = @import("vec3.zig");
+    _ = @import("vec.zig");
 }

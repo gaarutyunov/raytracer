@@ -1,5 +1,5 @@
 const Interval = @import("Interval.zig");
-const Point3 = @import("vec3.zig").Point3;
+const Point3 = @import("vec.zig").Point3;
 const Ray = @import("Ray.zig");
 
 const Self = @This();

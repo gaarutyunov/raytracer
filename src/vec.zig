@@ -1,7 +1,9 @@
 const std = @import("std");
+const Interval = @import("Interval.zig");
 
 pub const Vec3 = @Vector(3, f64);
 pub const Point3 = Vec3;
+pub const Color = Vec3;
 const Mask = @Vector(3, i32);
 
 pub fn length(u: Vec3) f64 {
@@ -77,6 +79,20 @@ pub fn randomRange(rand: std.Random, min: f64, max: f64) Vec3 {
     return minVec + (maxVec - minVec) * random(rand);
 }
 
+const intensity: Interval = .{ .min = 0.000, .max = 0.999 };
+
+pub fn write(c: Color, writer: *std.Io.Writer) !void {
+    const ir = @trunc(256 * intensity.clamp(linearToGamma(c[0])));
+    const ig = @trunc(256 * intensity.clamp(linearToGamma(c[1])));
+    const ib = @trunc(256 * intensity.clamp(linearToGamma(c[2])));
+
+    try writer.print("{d} {d} {d}\n", .{ ir, ig, ib });
+}
+
+fn linearToGamma(linear: f64) f64 {
+    if (linear > 0) return @sqrt(linear);
+    return 0;
+}
 test cross {
     const u: Vec3 = .{ 3, 5, -7 };
     const v: Vec3 = .{ 2, -6, 4 };

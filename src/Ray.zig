@@ -1,4 +1,4 @@
-const vec = @import("vec3.zig");
+const vec = @import("vec.zig");
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
 

@@ -1,6 +1,6 @@
-const vec = @import("vec3.zig");
+const vec = @import("vec.zig");
 const Ray = @import("Ray.zig");
-const Material = @import("Material.zig").Material;
+const Material = @import("material.zig").Material;
 
 const Self = @This();
 

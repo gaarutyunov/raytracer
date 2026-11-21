@@ -1,13 +1,12 @@
 const std = @import("std");
 const Ray = @import("Ray.zig");
-const vec = @import("vec3.zig");
-const color = @import("color.zig");
+const vec = @import("vec.zig");
 const Interval = @import("Interval.zig");
 const Hit = @import("Hit.zig");
-const Object = @import("Object.zig").Object;
+const Object = @import("object.zig").Object;
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
-const Color = color.Color;
+const Color = vec.Color;
 
 const Self = @This();
 
@@ -100,7 +99,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, con
 
     var group: std.Io.Group = .init;
     var semaphore: std.Io.Semaphore = .{ .permits = concurrency };
-    var colors: []color.Color = try gpa.alloc(color.Color, self.image_width * self.image_height);
+    var colors: []Color = try gpa.alloc(Color, self.image_width * self.image_height);
     _ = &colors;
 
     const pr = std.Progress.start(io, .{
@@ -118,7 +117,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, con
         progress: std.Progress.Node,
         world: Object,
 
-        pub fn worker(ctx: *@This(), result: []color.Color, row: usize) !void {
+        pub fn worker(ctx: *@This(), result: []Color, row: usize) !void {
             try ctx.semaphore.wait(ctx.io);
             defer ctx.semaphore.post(ctx.io);
             defer ctx.progress.completeOne();
@@ -127,7 +126,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, con
             const rand = prng.random();
 
             for (0..ctx.camera.image_width) |i| {
-                var pixel_color: color.Color = .{ 0, 0, 0 };
+                var pixel_color: Color = .{ 0, 0, 0 };
 
                 for (0..ctx.camera.samples_per_pixel) |_| {
                     pixel_color += ctx.camera.rayColor(
@@ -161,7 +160,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, con
     try group.await(io);
 
     for (colors) |value| {
-        try color.write(value, writer);
+        try vec.write(value, writer);
     }
     try writer.flush();
 }

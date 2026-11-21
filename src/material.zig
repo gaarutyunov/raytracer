@@ -1,8 +1,7 @@
 const Ray = @import("Ray.zig");
-const color = @import("color.zig");
-const vec = @import("vec3.zig");
-const Color = @import("color.zig").Color;
+const vec = @import("vec.zig");
 const std = @import("std");
+const Color = vec.Color;
 
 pub const Material = union(enum) {
     lambertian: struct {
