@@ -11,7 +11,7 @@ pub const Material = union(enum) {
         pub fn scatter(
             self: @This(),
             rand: std.Random,
-            _: Ray,
+            r_in: Ray,
             point: vec.Point3,
             normal: vec.Vec3,
             _: bool,
@@ -20,7 +20,7 @@ pub const Material = union(enum) {
 
             if (vec.isNearZero(scatter_direction)) scatter_direction = normal;
 
-            return .{ .init(point, scatter_direction), self.albedo };
+            return .{ .init(point, scatter_direction, r_in.time), self.albedo };
         }
     },
     metal: struct {
@@ -38,9 +38,11 @@ pub const Material = union(enum) {
             var reflected = vec.reflect(r_in.direction, normal);
             reflected = vec.unit(reflected) + @as(vec.Vec3, @splat(self.fuzz)) * vec.randomUnit(rand);
 
-            const scattered: Ray = .init(point, reflected);
+            const scattered: Ray = .init(point, reflected, 0);
 
-            if (vec.dot(scattered.direction, normal) > 0) return .{ .init(point, reflected), self.albedo };
+            if (vec.dot(scattered.direction, normal) > 0) {
+                return .{ .init(point, reflected, r_in.time), self.albedo };
+            }
 
             return null;
         }
@@ -72,7 +74,7 @@ pub const Material = union(enum) {
                 direction = vec.refract(unit_direction, normal, refraction_index);
             }
 
-            return .{ .init(point, direction), self.albedo };
+            return .{ .init(point, direction, r_in.time), self.albedo };
         }
 
         fn reflectance(cosine: f64, refraction_index: f64) f64 {

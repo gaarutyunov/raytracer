@@ -6,11 +6,13 @@ const Ray = @This();
 
 origin: Point3,
 direction: Vec3,
+time: f64,
 
-pub fn init(origin: Point3, direction: Vec3) Ray {
+pub fn init(origin: Point3, direction: Vec3, time: f64) Ray {
     return .{
         .origin = origin,
         .direction = direction,
+        .time = time,
     };
 }
 

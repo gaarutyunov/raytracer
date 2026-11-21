@@ -3,7 +3,7 @@ const Ray = @import("Ray.zig");
 const vec = @import("vec3.zig");
 const color = @import("color.zig");
 const Interval = @import("Interval.zig");
-const HitRecord = @import("HitRecord.zig");
+const Hit = @import("Hit.zig");
 const Object = @import("Object.zig").Object;
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
@@ -87,7 +87,7 @@ pub fn init(
     };
 }
 
-pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []Object, concurrency: usize) !void {
+pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: Object, concurrency: usize) !void {
     var buffer: [4096]u8 = undefined;
     var errbuffer: [256]u8 = undefined;
 
@@ -116,7 +116,7 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []Object, c
         semaphore: *std.Io.Semaphore,
         camera: Self,
         progress: std.Progress.Node,
-        world: []Object,
+        world: Object,
 
         pub fn worker(ctx: *@This(), result: []color.Color, row: usize) !void {
             try ctx.semaphore.wait(ctx.io);
@@ -166,10 +166,10 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []Object, c
     try writer.flush();
 }
 
-fn rayColor(self: Self, rand: std.Random, r: Ray, world: []Object, depth: u32) Color {
+fn rayColor(self: Self, rand: std.Random, r: Ray, world: Object, depth: u32) Color {
     if (depth <= 0) return .{ 0, 0, 0 };
 
-    if (hit(world, r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
+    if (world.hit(r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
         if (rec.mat.scatter(rand, r, rec.p, rec.normal, rec.front_face)) |srec| {
             const scattered, const attenuation = srec;
             return attenuation * self.rayColor(rand, scattered, world, depth - 1);
@@ -179,21 +179,8 @@ fn rayColor(self: Self, rand: std.Random, r: Ray, world: []Object, depth: u32) C
     const unit_dir = vec.unit(r.direction);
     const a: Vec3 = @splat(0.5 * unit_dir[1] + 1.0);
 
-    return (@as(Vec3, @splat(1.0)) - a) * Color{ 1.0, 1.0, 1.0 } + a * Color{ 0.5, 0.7, 1.0 };
-}
-
-fn hit(objects: []Object, ray: Ray, ray_t: Interval) ?HitRecord {
-    var rec: ?HitRecord = null;
-    var closest = ray_t.max;
-
-    for (objects) |elem| {
-        if (elem.hit(ray, .{ .min = ray_t.min, .max = closest })) |r| {
-            closest = r.t;
-            rec = r;
-        }
-    }
-
-    return rec;
+    return (@as(Vec3, @splat(1.0)) - a) * Color{ 1.0, 1.0, 1.0 } +
+        a * Color{ 0.5, 0.7, 1.0 };
 }
 
 fn getRay(self: Self, rand: std.Random, i: usize, j: usize) Ray {
@@ -203,8 +190,9 @@ fn getRay(self: Self, rand: std.Random, i: usize, j: usize) Ray {
         @as(Vec3, @splat(@as(f64, @floatFromInt(i)) + x)) * self.pixel_delta_u +
         @as(Vec3, @splat(@as(f64, @floatFromInt(j)) + y)) * self.pixel_delta_v;
     const ray_origin = if (self.defocus_angle <= 0) self.center else self.defocusDiskSample(rand);
+    const ray_time = rand.float(f64);
 
-    return .init(ray_origin, pixel_sample - ray_origin);
+    return .init(ray_origin, pixel_sample - ray_origin, ray_time);
 }
 
 fn defocusDiskSample(self: Self, rand: std.Random) Point3 {
