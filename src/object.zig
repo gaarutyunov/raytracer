@@ -122,13 +122,16 @@ pub const Object = union(enum) {
 
     pub fn initTree(
         gpa: std.mem.Allocator,
-        rand: std.Random,
         objects: []Object,
     ) !Object {
-        const axis = rand.uintAtMost(u32, 2);
+        var bbox: BoundingBox = .empty;
+        for (objects) |object| {
+            bbox = .fromBoxes(bbox, object.bounding_box());
+        }
+        const axis = bbox.longest_axis();
 
-        var left = try gpa.create(Object);
-        var right = try gpa.create(Object);
+        const left = try gpa.create(Object);
+        const right = try gpa.create(Object);
 
         if (objects.len == 1) {
             left.* = objects[0];
@@ -139,15 +142,15 @@ pub const Object = union(enum) {
         } else {
             std.sort.pdq(Object, objects, SortContext{ .axis = axis }, compareTree);
             const mid = objects.len / 2;
-            left.* = try .initTree(gpa, rand, objects[0..mid]);
-            right.* = try .initTree(gpa, rand, objects[mid..]);
+            left.* = try .initTree(gpa, objects[0..mid]);
+            right.* = try .initTree(gpa, objects[mid..]);
         }
 
         return .{
             .tree = .{
                 .left = left,
                 .right = right,
-                .bbox = .fromBoxes(left.bounding_box(), right.bounding_box()),
+                .bbox = bbox,
             },
         };
     }

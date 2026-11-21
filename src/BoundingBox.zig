@@ -67,3 +67,11 @@ pub fn axis_interval(self: Self, axis: usize) Interval {
         else => unreachable,
     };
 }
+
+pub fn longest_axis(self: Self) u32 {
+    if (self.x.size() > self.y.size()) {
+        return if (self.x.size() > self.z.size()) 0 else 2;
+    }
+
+    return if (self.y.size() > self.x.size()) 1 else 2;
+}

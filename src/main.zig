@@ -78,7 +78,7 @@ const Scene = struct {
         });
 
         return .{
-            .world = try .initTree(gpa, rand, world.items),
+            .world = try .initTree(gpa, world.items),
             .camera = try .init(
                 50,
                 100,
