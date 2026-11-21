@@ -1,10 +1,10 @@
 const std = @import("std");
 const Ray = @import("Ray.zig");
-const Hittable = @import("Hittable.zig");
 const vec = @import("vec3.zig");
 const color = @import("color.zig");
 const Interval = @import("Interval.zig");
 const HitRecord = @import("HitRecord.zig");
+const Object = @import("Object.zig").Object;
 const Vec3 = vec.Vec3;
 const Point3 = vec.Point3;
 const Color = color.Color;
@@ -87,7 +87,7 @@ pub fn init(
     };
 }
 
-pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hittable, concurrency: usize) !void {
+pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []Object, concurrency: usize) !void {
     var buffer: [4096]u8 = undefined;
     var errbuffer: [256]u8 = undefined;
 
@@ -100,8 +100,8 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hi
 
     var group: std.Io.Group = .init;
     var semaphore: std.Io.Semaphore = .{ .permits = concurrency };
-    var result: []color.Color = try gpa.alloc(color.Color, self.image_width * self.image_height);
-    _ = &result;
+    var colors: []color.Color = try gpa.alloc(color.Color, self.image_width * self.image_height);
+    _ = &colors;
 
     const pr = std.Progress.start(io, .{
         .draw_buffer = &errbuffer,
@@ -114,13 +114,11 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hi
     const Context = struct {
         io: std.Io,
         semaphore: *std.Io.Semaphore,
-        result: []color.Color,
         camera: Self,
         progress: std.Progress.Node,
-        world: []*const Hittable,
-        row: usize,
+        world: []Object,
 
-        pub fn run(ctx: *@This()) !void {
+        pub fn worker(ctx: *@This(), result: []color.Color, row: usize) !void {
             try ctx.semaphore.wait(ctx.io);
             defer ctx.semaphore.post(ctx.io);
             defer ctx.progress.completeOne();
@@ -134,13 +132,13 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hi
                 for (0..ctx.camera.samples_per_pixel) |_| {
                     pixel_color += ctx.camera.rayColor(
                         rand,
-                        ctx.camera.getRay(rand, i, ctx.row),
+                        ctx.camera.getRay(rand, i, row),
                         ctx.world,
                         ctx.camera.max_depth,
                     );
                 }
 
-                ctx.result[i] = pixel_color * @as(Vec3, @splat(ctx.camera.pixel_samples_scale));
+                result[i] = pixel_color * @as(Vec3, @splat(ctx.camera.pixel_samples_scale));
             }
         }
     };
@@ -152,21 +150,23 @@ pub fn render(self: Self, gpa: std.mem.Allocator, io: std.Io, world: []*const Hi
             .semaphore = &semaphore,
             .world = world,
             .camera = self,
-            .result = result[self.image_width * j .. self.image_width * j + self.image_width],
-            .row = j,
         };
-        try group.concurrent(io, Context.run, .{&ctx});
+        try group.concurrent(
+            io,
+            Context.worker,
+            .{ &ctx, colors[self.image_width * j ..][0..self.image_width], j },
+        );
     }
 
     try group.await(io);
 
-    for (result) |value| {
+    for (colors) |value| {
         try color.write(value, writer);
     }
     try writer.flush();
 }
 
-fn rayColor(self: Self, rand: std.Random, r: Ray, world: []*const Hittable, depth: u32) Color {
+fn rayColor(self: Self, rand: std.Random, r: Ray, world: []Object, depth: u32) Color {
     if (depth <= 0) return .{ 0, 0, 0 };
 
     if (hit(world, r, .{ .min = 0.001, .max = std.math.inf(f64) })) |rec| {
@@ -182,7 +182,7 @@ fn rayColor(self: Self, rand: std.Random, r: Ray, world: []*const Hittable, dept
     return (@as(Vec3, @splat(1.0)) - a) * Color{ 1.0, 1.0, 1.0 } + a * Color{ 0.5, 0.7, 1.0 };
 }
 
-fn hit(objects: []*const Hittable, ray: Ray, ray_t: Interval) ?HitRecord {
+fn hit(objects: []Object, ray: Ray, ray_t: Interval) ?HitRecord {
     var rec: ?HitRecord = null;
     var closest = ray_t.max;
 

@@ -1,6 +1,5 @@
 const std = @import("std");
-const Hittable = @import("Hittable.zig");
-const Sphere = @import("Sphere.zig");
+const Object = @import("Object.zig").Object;
 const Camera = @import("Camera.zig");
 const vec = @import("vec3.zig");
 const Material = @import("Material.zig").Material;
@@ -11,13 +10,15 @@ pub fn main(init: std.process.Init) !void {
 
     const gpa = init.arena.allocator();
 
-    var world: std.ArrayList(*const Hittable) = try .initCapacity(gpa, 1000);
+    var world: std.ArrayList(Object) = try .initCapacity(gpa, 1000);
 
-    try world.append(gpa, &Sphere.init(
-        .{ 0, -1000, 0 },
-        1000,
-        .{ .lambertian = .{ .albedo = .{ 0.5, 0.5, 0.5 } } },
-    ).interface);
+    try world.append(gpa, .{
+        .sphere = .{
+            .center = .{ 0, -1000, 0 },
+            .radius = 1000,
+            .material = .{ .lambertian = .{ .albedo = .{ 0.5, 0.5, 0.5 } } },
+        },
+    });
 
     for (0..22) |i| {
         const a: f64 = @floatFromInt(@as(i64, @intCast(i)) - 11);
@@ -31,54 +32,70 @@ pub fn main(init: std.process.Init) !void {
             };
 
             if (vec.length(center - vec.Point3{ 4, 0.2, 0 }) > 0.9) {
-                try world.append(gpa, &Sphere.init(
-                    center,
-                    0.2,
-                    if (choose_mat < 0.8)
-                        .{
-                            .lambertian = .{
-                                .albedo = vec.random(rand) * vec.random(rand),
+                try world.append(gpa, .{
+                    .sphere = .{
+                        .radius = 0.2,
+                        .center = center,
+                        .material = if (choose_mat < 0.8)
+                            .{
+                                .lambertian = .{
+                                    .albedo = vec.random(rand) * vec.random(rand),
+                                },
+                            }
+                        else if (choose_mat < 0.95)
+                            .{
+                                .metal = .{
+                                    .albedo = vec.randomRange(rand, 0.5, 1.0),
+                                    .fuzz = 0.5 * rand.float(f64),
+                                },
+                            }
+                        else
+                            .{
+                                .dielectric = .{
+                                    .refraction_index = 1.5,
+                                },
                             },
-                        }
-                    else if (choose_mat < 0.95)
-                        .{
-                            .metal = .{
-                                .albedo = vec.randomRange(rand, 0.5, 1.0),
-                                .fuzz = 0.5 * rand.float(f64),
-                            },
-                        }
-                    else
-                        .{
-                            .dielectric = .{
-                                .refraction_index = 1.5,
-                            },
-                        },
-                ).interface);
+                    },
+                });
             }
         }
     }
 
-    try world.append(gpa, &Sphere.init(
-        .{ 0, 1, 0 },
-        1.0,
-        .{ .dielectric = .{ .refraction_index = 1.5 } },
-    ).interface);
-    try world.append(gpa, &Sphere.init(
-        .{ -4, 1, 0 },
-        1.0,
-        .{ .lambertian = .{ .albedo = .{ 0.4, 0.2, 0.1 } } },
-    ).interface);
-    try world.append(gpa, &Sphere.init(
-        .{ 4, 1, 0 },
-        1.0,
-        .{ .metal = .{ .albedo = .{ 0.7, 0.6, 0.5 }, .fuzz = 0.0 } },
-    ).interface);
+    try world.appendSlice(gpa, &.{
+        .{
+            .sphere = .{
+                .center = .{ 0, 1, 0 },
+                .radius = 1.0,
+                .material = .{
+                    .dielectric = .{ .refraction_index = 1.5 },
+                },
+            },
+        },
+        .{
+            .sphere = .{
+                .center = .{ -4, 1, 0 },
+                .radius = 1.0,
+                .material = .{
+                    .lambertian = .{ .albedo = .{ 0.4, 0.2, 0.1 } },
+                },
+            },
+        },
+        .{
+            .sphere = .{
+                .center = .{ 4, 1, 0 },
+                .radius = 1.0,
+                .material = .{
+                    .metal = .{ .albedo = .{ 0.7, 0.6, 0.5 }, .fuzz = 0.0 },
+                },
+            },
+        },
+    });
 
     const camera: Camera = try .init(
         50,
-        500,
+        100,
         .{
-            .image_width = 1200,
+            .image_width = 400,
             .aspect_ratio = 16.0 / 9.0,
         },
         .{
