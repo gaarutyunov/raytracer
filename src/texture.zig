@@ -72,15 +72,21 @@ pub const Texture = union(enum) {
     },
     noise: struct {
         generator: Noise,
+        scale: f64,
 
         pub fn color(self: @This(), _: f64, _: f64, p: vec.Point3) vec.Color {
             return vec.Color{ 1, 1, 1 } *
-                @as(vec.Color, @splat(self.generator.generate(p)));
+                @as(vec.Color, @splat(self.generator.generate(@as(vec.Vec3, @splat(self.scale)) * p)));
         }
     },
 
-    pub fn initPerlin(rand: std.Random) Texture {
-        return .{ .noise = .{ .generator = .initPerlin(rand) } };
+    pub fn initPerlin(rand: std.Random, scale: f64) Texture {
+        return .{
+            .noise = .{
+                .generator = .initPerlin(rand),
+                .scale = scale,
+            },
+        };
     }
 
     pub fn initChecker(

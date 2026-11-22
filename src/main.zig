@@ -194,7 +194,7 @@ const Scene = struct {
     }
 
     pub fn initPerlin(gpa: std.mem.Allocator, rand: std.Random) !Scene {
-        const texture: Texture = .initPerlin(rand);
+        const texture: Texture = .initPerlin(rand, 4);
 
         var objects = try gpa.alloc(Object, 2);
         objects[0] = .initStaticSphere(

@@ -11,19 +11,27 @@ pub const Noise = union(enum) {
         perm_z: [point_count]u32 = undefined,
 
         pub fn generate(self: @This(), p: vec.Point3) f64 {
-            const g = p - @floor(p);
-            const i: usize, const j: usize, const k: usize =
-                @intCast(@as(@Vector(3, i32), @trunc(p)));
+            var g = p - @floor(p);
+            g = g * g * (@as(vec.Vec3, @splat(3)) - @as(vec.Vec3, @splat(2)) * g);
+            const pi: @Vector(3, i32) = @trunc(p);
+            const i, const j, const k = pi;
 
             var c: [2][2][2]f64 = undefined;
 
             inline for (0..2) |di| {
                 inline for (0..2) |dj| {
                     inline for (0..2) |dk| {
+                        const xi: usize = @intCast(
+                            (i + @as(i32, @intCast(di))) & 255,
+                        );
+                        const yi: usize = @intCast(
+                            (j + @as(i32, @intCast(dj))) & 255,
+                        );
+                        const zi: usize = @intCast(
+                            (k + @as(i32, @intCast(dk))) & 255,
+                        );
                         c[di][dj][dk] = self.randfloat[
-                            self.perm_x[(i + di) & 255] ^
-                                self.perm_y[(j + dj) & 255] ^
-                                self.perm_z[(k + dk) & 255]
+                            self.perm_x[xi] ^ self.perm_y[yi] ^ self.perm_z[zi]
                         ];
                     }
                 }
