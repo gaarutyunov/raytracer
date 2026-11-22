@@ -2,6 +2,7 @@ const std = @import("std");
 const zigimg = @import("zigimg");
 const vec = @import("vec.zig");
 const Interval = @import("Interval.zig");
+const Noise = @import("noise.zig").Noise;
 
 pub const Texture = union(enum) {
     solid_color: struct {
@@ -69,6 +70,18 @@ pub const Texture = union(enum) {
                 high - 1;
         }
     },
+    noise: struct {
+        generator: Noise,
+
+        pub fn color(self: @This(), _: f64, _: f64, p: vec.Point3) vec.Color {
+            return vec.Color{ 1, 1, 1 } *
+                @as(vec.Color, @splat(self.generator.generate(p)));
+        }
+    },
+
+    pub fn initPerlin(rand: std.Random) Texture {
+        return .{ .noise = .{ .generator = .initPerlin(rand) } };
+    }
 
     pub fn initChecker(
         gpa: std.mem.Allocator,

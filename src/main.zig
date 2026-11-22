@@ -6,12 +6,10 @@ const Material = @import("material.zig").Material;
 const Texture = @import("texture.zig").Texture;
 
 const Scene = struct {
-    const Self = @This();
-
     world: Object,
     camera: Camera,
 
-    pub fn initBouncingSpheres(gpa: std.mem.Allocator, rand: std.Random) !Self {
+    pub fn initBouncingSpheres(gpa: std.mem.Allocator, rand: std.Random) !Scene {
         var world: std.ArrayList(Object) = try .initCapacity(gpa, 1000);
 
         try world.append(gpa, .initStaticSphere(
@@ -117,7 +115,7 @@ const Scene = struct {
         };
     }
 
-    pub fn initCheckeredSpheres(gpa: std.mem.Allocator) !Self {
+    pub fn initCheckeredSpheres(gpa: std.mem.Allocator) !Scene {
         const checker: Texture = try .initChecker(
             gpa,
             0.32,
@@ -160,7 +158,7 @@ const Scene = struct {
         };
     }
 
-    pub fn initEarth(gpa: std.mem.Allocator) !Self {
+    pub fn initEarth(gpa: std.mem.Allocator) !Scene {
         return .{
             .world = .initStaticSphere(
                 .{ 0, 0, 0 },
@@ -194,6 +192,44 @@ const Scene = struct {
             ),
         };
     }
+
+    pub fn initPerlin(gpa: std.mem.Allocator, rand: std.Random) !Scene {
+        const texture: Texture = .initPerlin(rand);
+
+        var objects = try gpa.alloc(Object, 2);
+        objects[0] = .initStaticSphere(
+            .{ 0, -1000, 0 },
+            1000,
+            .initLambertian(.{ .texture = texture }),
+        );
+        objects[1] = .initStaticSphere(
+            .{ 0, 2, 0 },
+            2,
+            .initLambertian(.{ .texture = texture }),
+        );
+
+        return .{
+            .world = .initList(objects),
+            .camera = try .init(
+                50,
+                100,
+                .{
+                    .image_width = 400,
+                    .aspect_ratio = 16.0 / 9.0,
+                },
+                .{
+                    .vfov = 20,
+                    .look_from = .{ 13, 2, 3 },
+                    .look_at = .{ 0, 0, 0 },
+                    .vup = .{ 0, 1, 0 },
+                },
+                .{
+                    .defocus_angle = 0,
+                    .focus_distance = 10.0,
+                },
+            ),
+        };
+    }
 };
 
 pub fn main(init: std.process.Init) !void {
@@ -205,15 +241,17 @@ pub fn main(init: std.process.Init) !void {
     var iterArgs = try init.minimal.args.iterateAllocator(gpa);
 
     var scene_kind: enum {
-        bouncing_spheres,
-        checkered_spheres,
+        bouncing,
+        checkered,
         earth,
-    } = .bouncing_spheres;
+        perlin,
+    } = .bouncing;
 
     const map: std.StaticStringMap(@TypeOf(scene_kind)) = .initComptime(&.{
-        .{ "1", .bouncing_spheres },
-        .{ "2", .checkered_spheres },
+        .{ "1", .bouncing },
+        .{ "2", .checkered },
         .{ "3", .earth },
+        .{ "4", .perlin },
     });
 
     while (iterArgs.next()) |arg| {
@@ -228,9 +266,10 @@ pub fn main(init: std.process.Init) !void {
     }
 
     const scene: Scene = switch (scene_kind) {
-        .bouncing_spheres => try .initBouncingSpheres(gpa, rand),
-        .checkered_spheres => try .initCheckeredSpheres(gpa),
+        .bouncing => try .initBouncingSpheres(gpa, rand),
+        .checkered => try .initCheckeredSpheres(gpa),
         .earth => try .initEarth(gpa),
+        .perlin => try .initPerlin(gpa, rand),
     };
 
     try scene.camera.render(gpa, init.io, scene.world, try std.Thread.getCpuCount());
