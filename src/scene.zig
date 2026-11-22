@@ -5,15 +5,7 @@ const Camera = @import("Camera.zig");
 const vec = @import("vec.zig");
 const zigimg = @import("zigimg");
 
-pub const SceneKind = enum(u32) {
-    all,
-    bouncing,
-    checkered,
-    earth,
-    perlin,
-};
-
-pub const Scene = union(SceneKind) {
+pub const Scene = union(enum) {
     all: struct {
         scenes: []Scene,
     },
@@ -21,17 +13,19 @@ pub const Scene = union(SceneKind) {
     checkered: @import("scenes/Checkered.zig"),
     earth: @import("scenes/Earth.zig"),
     perlin: @import("scenes/Perlin.zig"),
+    quads: @import("scenes/Quads.zig"),
 
-    pub fn init(gpa: std.mem.Allocator, rand: std.Random, kind: SceneKind) !Scene {
+    pub fn init(gpa: std.mem.Allocator, rand: std.Random, kind: std.meta.Tag(Scene)) !Scene {
         return switch (kind) {
             .all => {
                 const n_scenes =
-                    @typeInfo(SceneKind).@"enum".field_names.len - 1;
+                    @typeInfo(@TypeOf(kind)).@"enum".field_names.len - 1;
 
                 var scenes: []Scene = try gpa.alloc(Scene, n_scenes);
 
                 inline for (0..n_scenes) |s| {
-                    scenes[s] = try .init(gpa, rand, @fromBackingInt(@as(u32, @intCast(s)) + 1));
+                    scenes[s] =
+                        try .init(gpa, rand, @fromBackingInt(@as(u32, @intCast(s)) + 1));
                 }
 
                 return .{

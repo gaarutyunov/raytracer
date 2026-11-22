@@ -23,8 +23,8 @@ pub const Orientation = struct {
 };
 
 pub const Focus = struct {
-    defocus_angle: f64,
-    focus_distance: f64,
+    defocus_angle: f64 = 0.0,
+    focus_distance: f64 = 10.0,
 };
 
 image_height: u32,
@@ -112,7 +112,7 @@ pub fn render(
             defer ctx.semaphore.post(ctx.io);
             defer ctx.progress.completeOne();
 
-            var prng: std.Random.DefaultPrng = .init(42);
+            var prng: std.Random.DefaultPrng = .init(row);
             const rand = prng.random();
 
             for (0..ctx.camera.image_width) |i| {

@@ -38,8 +38,36 @@ pub fn bounding_box(self: Self) BoundingBox {
 }
 
 pub fn hit(self: Self, ray: Ray, ray_t: Interval) ?Hit {
-    _ = self;
-    _ = ray;
-    _ = ray_t;
-    return null;
+    const n = vec.cross(self.u, self.v);
+    const normal = vec.unit(n);
+    const d = vec.dot(normal, self.q);
+    const denom = vec.dot(normal, ray.direction);
+    const w = n / @as(vec.Vec3, @splat(vec.dot(n, n)));
+
+    // parallel to the plain
+    if (@abs(denom) < 1e-8) return null;
+
+    const t = (d - vec.dot(normal, ray.origin)) / denom;
+    if (!ray_t.contains(t)) return null;
+
+    const intersection = ray.at(t);
+    const planar_hitpt_vector = intersection - self.q;
+    const alpha = vec.dot(w, vec.cross(planar_hitpt_vector, self.v));
+    const beta = vec.dot(w, vec.cross(self.u, planar_hitpt_vector));
+
+    var rec: Hit = .init(intersection, normal, t, ray, self.material);
+
+    rec.u, rec.v = isInterior(alpha, beta) orelse return null;
+
+    return rec;
+}
+
+fn isInterior(a: f64, b: f64) ?struct { f64, f64 } {
+    const interval: Interval = .{ .min = 0, .max = 1 };
+
+    if (!interval.contains(a) or !interval.contains(b)) {
+        return null;
+    }
+
+    return .{ a, b };
 }

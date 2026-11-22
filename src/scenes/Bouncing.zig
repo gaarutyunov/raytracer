@@ -134,7 +134,6 @@ pub fn init(gpa: std.mem.Allocator, rand: std.Random) !Self {
             },
             .{
                 .defocus_angle = 0.6,
-                .focus_distance = 10.0,
             },
         ),
     };

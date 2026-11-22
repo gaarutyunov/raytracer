@@ -6,7 +6,7 @@ const Material = @import("material.zig").Material;
 const Texture = @import("texture.zig").Texture;
 const scene = @import("scene.zig");
 const Scene = scene.Scene;
-const SceneKind = scene.SceneKind;
+const SceneKind = std.meta.Tag(Scene);
 
 pub fn main(init: std.process.Init) !void {
     var src: std.Random.DefaultPrng = .init(42);
@@ -25,7 +25,11 @@ pub fn main(init: std.process.Init) !void {
         if (std.mem.eql(u8, name, "--scene")) {
             const value = name_and_value.next() orelse "1";
 
-            const value_int = try std.fmt.parseUnsigned(u32, value, 10);
+            const value_int = try std.fmt.parseUnsigned(
+                std.meta.BackingInt(SceneKind),
+                value,
+                10,
+            );
 
             scene_kind = @fromBackingInt(value_int);
         }

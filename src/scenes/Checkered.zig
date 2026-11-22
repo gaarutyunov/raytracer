@@ -49,10 +49,7 @@ pub fn init(gpa: std.mem.Allocator, _: std.Random) !Self {
                 .look_at = .{ 0, 0, 0 },
                 .vup = .{ 0, 1, 0 },
             },
-            .{
-                .defocus_angle = 0,
-                .focus_distance = 10.0,
-            },
+            .{},
         ),
     };
 }
