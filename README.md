@@ -2,11 +2,11 @@
 
 ## Scenes
 
-![alt](bouncing.png)
-![alt](checkered.png)
-![alt](earth.png)
-![alt](perlin.png)
-![alt](quads.png)
+![alt](out/bouncing.png)
+![alt](out/checkered.png)
+![alt](out/earth.png)
+![alt](out/perlin.png)
+![alt](out/quads.png)
 
 ## References
 

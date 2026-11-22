@@ -35,7 +35,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    const s: Scene = try .init(gpa, rand, scene_kind);
+    const s: Scene = try .init(scene_kind, gpa, rand);
 
     var buffer: [512]u8 = undefined;
     const pr = std.Progress.start(init.io, .{

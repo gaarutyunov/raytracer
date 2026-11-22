@@ -15,7 +15,7 @@ pub const Scene = union(enum) {
     perlin: @import("scenes/Perlin.zig"),
     quads: @import("scenes/Quads.zig"),
 
-    pub fn init(gpa: std.mem.Allocator, rand: std.Random, kind: std.meta.Tag(Scene)) !Scene {
+    pub fn init(kind: std.meta.Tag(Scene), gpa: std.mem.Allocator, rand: std.Random) !Scene {
         return switch (kind) {
             .all => {
                 const n_scenes =
@@ -25,7 +25,7 @@ pub const Scene = union(enum) {
 
                 inline for (0..n_scenes) |s| {
                     scenes[s] =
-                        try .init(gpa, rand, @fromBackingInt(@as(u32, @intCast(s)) + 1));
+                        try .init(@fromBackingInt(@as(u32, @intCast(s)) + 1), gpa, rand);
                 }
 
                 return .{
@@ -81,9 +81,20 @@ pub const Scene = union(enum) {
                 const image: zigimg.Image = try .fromMemory(gpa, buffer[0..written]);
 
                 var write_buffer: [zigimg.io.DEFAULT_BUFFER_SIZE]u8 = undefined;
-                try image.writeToFilePath(gpa, io, @tagName(tag) ++ ".png", &write_buffer, .{
-                    .png = .{},
-                });
+                const dir: std.Io.Dir = .cwd();
+                dir.createDir(io, "out", .default_file) catch |err| switch (err) {
+                    std.Io.Dir.CreateDirError.PathAlreadyExists => {},
+                    else => return err,
+                };
+                try image.writeToFilePath(
+                    gpa,
+                    io,
+                    "out/" ++ @tagName(tag) ++ ".png",
+                    &write_buffer,
+                    .{
+                        .png = .{},
+                    },
+                );
             },
         }
     }
