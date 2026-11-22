@@ -33,7 +33,14 @@ pub fn main(init: std.process.Init) !void {
 
     const s: Scene = try .init(gpa, rand, scene_kind);
 
-    try s.render(gpa, init.io, try std.Thread.getCpuCount());
+    var buffer: [512]u8 = undefined;
+    const pr = std.Progress.start(init.io, .{
+        .draw_buffer = &buffer,
+        .root_name = "raytracing",
+    });
+    defer pr.end();
+
+    try s.render(gpa, init.io, pr, try std.Thread.getCpuCount());
 }
 
 test main {

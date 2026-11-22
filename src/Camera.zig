@@ -90,24 +90,15 @@ pub fn render(
     self: Self,
     gpa: std.mem.Allocator,
     io: std.Io,
+    pr: std.Progress.Node,
     writer: *std.Io.Writer,
     world: Object,
     concurrency: usize,
 ) !usize {
-    var errbuffer: [256]u8 = undefined;
-
     var group: std.Io.Group = .init;
     var semaphore: std.Io.Semaphore = .{ .permits = concurrency };
     var colors: []Color = try gpa.alloc(Color, self.image_width * self.image_height);
     _ = &colors;
-
-    const pr = std.Progress.start(io, .{
-        .draw_buffer = &errbuffer,
-        .estimated_total_items = self.image_height,
-        .root_name = "raytracing",
-    });
-
-    defer pr.end();
 
     const Context = struct {
         io: std.Io,

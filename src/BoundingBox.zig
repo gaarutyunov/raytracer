@@ -11,7 +11,7 @@ z: Interval,
 pub const empty: Self = .{ .x = .empty, .y = .empty, .z = .empty };
 
 pub fn fromPoints(a: Point3, b: Point3) Self {
-    return .{
+    const self: Self = .{
         .x = if (a[0] <= b[0])
             .{ .min = a[0], .max = b[0] }
         else
@@ -25,13 +25,26 @@ pub fn fromPoints(a: Point3, b: Point3) Self {
         else
             .{ .max = a[2], .min = b[2] },
     };
+
+    return self.add_padding();
 }
 
 pub fn fromBoxes(a: Self, b: Self) Self {
-    return .{
+    const self: Self = .{
         .x = .fromIntervals(a.x, b.x),
         .y = .fromIntervals(a.y, b.y),
         .z = .fromIntervals(a.z, b.z),
+    };
+
+    return self.add_padding();
+}
+
+fn add_padding(self: Self) Self {
+    const delta = 0.001;
+    return .{
+        .x = if (self.x.size() < delta) self.x.expand(delta) else self.x,
+        .y = if (self.y.size() < delta) self.y.expand(delta) else self.y,
+        .z = if (self.z.size() < delta) self.z.expand(delta) else self.z,
     };
 }
 

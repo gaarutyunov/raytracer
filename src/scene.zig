@@ -286,14 +286,27 @@ pub const Scene = union(SceneKind) {
         };
     }
 
-    pub fn render(self: Scene, gpa: std.mem.Allocator, io: std.Io, concurrency: usize) !void {
+    pub fn render(
+        self: Scene,
+        gpa: std.mem.Allocator,
+        io: std.Io,
+        pr: std.Progress.Node,
+        concurrency: usize,
+    ) !void {
         switch (self) {
             .all => |all| {
+                const pr1 = pr.start("scenes", all.scenes.len);
+                defer pr1.end();
+
                 for (all.scenes) |scene| {
-                    try scene.render(gpa, io, concurrency);
+                    defer pr1.completeOne();
+                    try scene.render(gpa, io, pr1, concurrency);
                 }
             },
             inline else => |scene, tag| {
+                const pr1 = pr.start(@tagName(tag), scene.camera.image_height);
+                defer pr1.end();
+
                 var buffer = try gpa.alloc(u8, 4 * 1024 * 1024);
                 _ = &buffer;
 
@@ -303,6 +316,7 @@ pub const Scene = union(SceneKind) {
                 const written = try scene.camera.render(
                     gpa,
                     io,
+                    pr1,
                     &writer,
                     scene.world,
                     concurrency,
