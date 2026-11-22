@@ -6,6 +6,7 @@
 ![alt](checkered.png)
 ![alt](earth.png)
 ![alt](perlin.png)
+![alt](quads.png)
 
 ## References
 
