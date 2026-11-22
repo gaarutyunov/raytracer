@@ -9,68 +9,28 @@ const Point3 = vec.Point3;
 const Vec3 = vec.Vec3;
 
 pub const Object = union(enum) {
-    sphere: struct {
-        const Sphere = @This();
-
-        center: Ray,
-        radius: f64,
-        material: Material,
-        bbox: BoundingBox,
-
-        pub fn bounding_box(self: Sphere) BoundingBox {
-            return self.bbox;
-        }
-
-        pub fn hit(self: Sphere, ray: Ray, ray_t: Interval) ?Hit {
-            const current_center = self.center.at(ray.time);
-            const oc: Vec3 = current_center - ray.origin;
-            const a = vec.dot(ray.direction, ray.direction);
-            const h = vec.dot(ray.direction, oc);
-            const c = vec.dot(oc, oc) - self.radius * self.radius;
-
-            const d = h * h - a * c;
-
-            if (d < 0) {
-                return null;
-            }
-
-            const sqrtd = std.math.sqrt(d);
-
-            var root = (h - sqrtd) / a;
-
-            if (!ray_t.surrounds(root)) {
-                root = (h + sqrtd) / a;
-                if (!ray_t.surrounds(root)) {
-                    return null;
-                }
-            }
-
-            const p = ray.at(root);
-            const outward_normal = (p - current_center) /
-                @as(Vec3, @splat(self.radius));
-
-            var rec: Hit = .init(p, outward_normal, root, ray, self.material);
-
-            rec.u, rec.v = point_to_uv(outward_normal);
-
-            return rec;
-        }
-
-        fn point_to_uv(p: Point3) struct { f64, f64 } {
-            const theta = std.math.acos(-p[1]); // 𝜃=arccos(−𝑦)
-            const phi = std.math.atan2(-p[2], p[0]) + std.math.pi; // 𝜙=atan2(−𝑧,𝑥)+𝜋
-            return .{
-                phi / (2 * std.math.pi), // 𝑢=𝜙/2𝜋
-                theta / std.math.pi, // 𝑣=𝜃/𝜋
-            };
-        }
-    },
+    sphere: @import("objects/Sphere.zig"),
+    quad: @import("objects/Quad.zig"),
 
     list: struct {
         const List = @This();
 
+        pub const Options = struct {
+            objects: []const Object,
+        };
+
         objects: []const Object,
         bbox: BoundingBox = .empty,
+
+        pub fn init(options: Options) !List {
+            var bbox: BoundingBox = .empty;
+
+            for (options.objects) |obj| {
+                bbox = .fromBoxes(bbox, obj.bounding_box());
+            }
+
+            return .{ .objects = options.objects, .bbox = bbox };
+        }
 
         pub fn bounding_box(self: List) BoundingBox {
             return self.bbox;
@@ -94,9 +54,68 @@ pub const Object = union(enum) {
     tree: struct {
         const Tree = @This();
 
+        pub const Options = struct {
+            gpa: std.mem.Allocator,
+            objects: []Object,
+        };
+
         left: *Object,
         right: *Object,
         bbox: BoundingBox,
+
+        pub fn init(options: Options) !Tree {
+            const gpa = options.gpa;
+            var objects = options.objects;
+
+            var bbox: BoundingBox = .empty;
+            for (objects) |object| {
+                bbox = .fromBoxes(bbox, object.bounding_box());
+            }
+            const axis = bbox.longest_axis();
+
+            const left = try gpa.create(Object);
+            const right = try gpa.create(Object);
+
+            if (objects.len == 1) {
+                left.* = objects[0];
+                right.* = objects[0];
+            } else if (objects.len == 2) {
+                left.* = objects[0];
+                right.* = objects[1];
+            } else {
+                std.sort.pdq(Object, objects, SortContext{ .axis = axis }, compareTree);
+                const mid = objects.len / 2;
+                left.* = .{
+                    .tree = try Tree.init(.{
+                        .gpa = gpa,
+                        .objects = objects[0..mid],
+                    }),
+                };
+                right.* = .{
+                    .tree = try Tree.init(.{
+                        .gpa = gpa,
+                        .objects = objects[mid..],
+                    }),
+                };
+            }
+
+            return .{
+                .left = left,
+                .right = right,
+                .bbox = bbox,
+            };
+        }
+
+        const SortContext = struct {
+            axis: u32,
+        };
+
+        fn compareTree(ctx: SortContext, lhs: Object, rhs: Object) bool {
+            const l_axis_interval = lhs.bounding_box().axis_interval(ctx.axis);
+            const r_axis_interval = rhs.bounding_box().axis_interval(ctx.axis);
+
+            return l_axis_interval.min < r_axis_interval.min;
+        }
 
         pub fn bounding_box(self: Tree) BoundingBox {
             return self.bbox;
@@ -119,95 +138,15 @@ pub const Object = union(enum) {
         }
     },
 
-    pub fn initList(objects: []const Object) Object {
-        var bbox: BoundingBox = .empty;
-
-        for (objects) |obj| {
-            bbox = .fromBoxes(bbox, obj.bounding_box());
-        }
-
-        return .{ .list = .{ .objects = objects, .bbox = bbox } };
-    }
-
-    const SortContext = struct {
-        axis: u32,
-    };
-
-    pub fn initTree(
-        gpa: std.mem.Allocator,
-        objects: []Object,
+    pub fn init(
+        comptime kind: std.meta.Tag(Object),
+        options: @FieldType(Object, @tagName(kind)).Options,
     ) !Object {
-        var bbox: BoundingBox = .empty;
-        for (objects) |object| {
-            bbox = .fromBoxes(bbox, object.bounding_box());
-        }
-        const axis = bbox.longest_axis();
-
-        const left = try gpa.create(Object);
-        const right = try gpa.create(Object);
-
-        if (objects.len == 1) {
-            left.* = objects[0];
-            right.* = objects[0];
-        } else if (objects.len == 2) {
-            left.* = objects[0];
-            right.* = objects[1];
-        } else {
-            std.sort.pdq(Object, objects, SortContext{ .axis = axis }, compareTree);
-            const mid = objects.len / 2;
-            left.* = try .initTree(gpa, objects[0..mid]);
-            right.* = try .initTree(gpa, objects[mid..]);
-        }
-
-        return .{
-            .tree = .{
-                .left = left,
-                .right = right,
-                .bbox = bbox,
-            },
-        };
-    }
-
-    fn compareTree(ctx: SortContext, lhs: Object, rhs: Object) bool {
-        const l_axis_interval = lhs.bounding_box().axis_interval(ctx.axis);
-        const r_axis_interval = rhs.bounding_box().axis_interval(ctx.axis);
-
-        return l_axis_interval.min < r_axis_interval.min;
-    }
-
-    pub fn initStaticSphere(center: Point3, radius: f64, material: Material) Object {
-        return .{
-            .sphere = .{
-                .center = .init(center, .{ 0, 0, 0 }, 0),
-                .radius = radius,
-                .material = material,
-                .bbox = .fromPoints(
-                    center - @as(Vec3, @splat(radius)),
-                    center + @as(Vec3, @splat(radius)),
-                ),
-            },
-        };
-    }
-
-    pub fn initMovingSphere(
-        center1: Point3,
-        center2: Point3,
-        radius: f64,
-        material: Material,
-    ) Object {
-        const rvec: Vec3 = @splat(radius);
-        const center: Ray = .init(center1, center2 - center1, 0);
-        return .{
-            .sphere = .{
-                .center = center,
-                .radius = radius,
-                .material = material,
-                .bbox = .fromBoxes(
-                    .fromPoints(center.at(0) - rvec, center.at(0) + rvec),
-                    .fromPoints(center.at(1) - rvec, center.at(1) + rvec),
-                ),
-            },
-        };
+        return @unionInit(
+            Object,
+            @tagName(kind),
+            try @FieldType(Object, @tagName(kind)).init(options),
+        );
     }
 
     pub fn hit(self: Object, ray: Ray, ray_t: Interval) ?Hit {
@@ -222,3 +161,17 @@ pub const Object = union(enum) {
         };
     }
 };
+
+test "init" {
+    const quad: Object = try .init(.quad, .{
+        .q = .{ 0, 0, 0 },
+        .u = .{ 0, 0, 0 },
+        .v = .{ 0, 0, 0 },
+        .material = .initLambertian(.{ .color = .{ 0, 0, 0 } }),
+    });
+
+    switch (quad) {
+        .quad => {},
+        else => return error.NotQuad,
+    }
+}

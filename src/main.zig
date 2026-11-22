@@ -47,4 +47,5 @@ test main {
     _ = @import("vec.zig");
     _ = @import("texture.zig");
     _ = @import("noise.zig");
+    _ = @import("object.zig");
 }

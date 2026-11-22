@@ -18,7 +18,8 @@ pub const Texture = union(enum) {
         odd: *const Texture,
 
         pub fn color(self: @This(), u: f64, v: f64, p: vec.Point3) vec.Color {
-            const a: i64 = @trunc(@reduce(.Add, p / @as(vec.Vec3, @splat(self.scale))));
+            const a: i64 =
+                @trunc(@reduce(.Add, @floor(p / @as(vec.Vec3, @splat(self.scale)))));
             const is_even = @mod(a, 2) == 0;
 
             return if (is_even)
