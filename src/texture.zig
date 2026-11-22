@@ -18,11 +18,8 @@ pub const Texture = union(enum) {
         odd: *const Texture,
 
         pub fn color(self: @This(), u: f64, v: f64, p: vec.Point3) vec.Color {
-            const x_int: i32 = @trunc(p[0] / self.scale);
-            const y_int: i32 = @trunc(p[1] / self.scale);
-            const z_int: i32 = @trunc(p[2] / self.scale);
-
-            const is_even = @mod(x_int + y_int + z_int, 2) == 0;
+            const a: i64 = @trunc(@reduce(.Add, p / @as(vec.Vec3, @splat(self.scale))));
+            const is_even = @mod(a, 2) == 0;
 
             return if (is_even)
                 self.even.color(u, v, p)
@@ -75,8 +72,11 @@ pub const Texture = union(enum) {
         scale: f64,
 
         pub fn color(self: @This(), _: f64, _: f64, p: vec.Point3) vec.Color {
-            return vec.Color{ 1, 1, 1 } *
-                @as(vec.Color, @splat(self.generator.generate(@as(vec.Vec3, @splat(self.scale)) * p)));
+            const noise = self.generator.turbulence(p, 7);
+            const modifier: vec.Vec3 = @splat(
+                1 + @sin(self.scale * p[2] + 10 * noise),
+            );
+            return vec.Color{ 0.5, 0.5, 0.5 } * modifier;
         }
     },
 

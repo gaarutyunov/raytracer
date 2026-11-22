@@ -90,18 +90,11 @@ pub fn render(
     self: Self,
     gpa: std.mem.Allocator,
     io: std.Io,
+    writer: *std.Io.Writer,
     world: Object,
     concurrency: usize,
-) !void {
-    var buffer: [4096]u8 = undefined;
+) !usize {
     var errbuffer: [256]u8 = undefined;
-
-    const stdout = std.Io.File.stdout();
-    defer stdout.close(io);
-    var stdout_writer = stdout.writer(io, &buffer);
-    const writer = &stdout_writer.interface;
-
-    try writer.print("P3\n{d} {d}\n255\n", .{ self.image_width, self.image_height });
 
     var group: std.Io.Group = .init;
     var semaphore: std.Io.Semaphore = .{ .permits = concurrency };
@@ -165,10 +158,23 @@ pub fn render(
 
     try group.await(io);
 
+    var written: usize = blk: {
+        var buffer: [64]u8 = undefined;
+
+        break :blk try writer.write(try std.mem.print(
+            &buffer,
+            "P3\n{d} {d}\n255\n",
+            .{ self.image_width, self.image_height },
+        ));
+    };
+
     for (colors) |value| {
-        try vec.write(value, writer);
+        written += try vec.write(value, writer);
     }
+
     try writer.flush();
+
+    return written;
 }
 
 fn rayColor(self: Self, rand: std.Random, r: Ray, world: Object, depth: u32) Color {

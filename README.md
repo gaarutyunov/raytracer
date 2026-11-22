@@ -1,13 +1,14 @@
-# References
+# raytracer
 
-## Book 1
+## Scenes
 
-https://raytracing.github.io/books/RayTracingInOneWeekend.html
+![alt](bouncing.png)
+![alt](checkered.png)
+![alt](earth.png)
+![alt](perlin.png)
 
-![Book 1](book1.png)
+## References
 
-## Book 2
-
-https://raytracing.github.io/books/RayTracingTheNextWeek.html
-
+- [Book 1](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
+- [Book 2](https://raytracing.github.io/books/RayTracingTheNextWeek.html)
 
